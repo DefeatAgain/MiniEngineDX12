@@ -122,6 +122,7 @@ namespace glTF
     {
         std::vector<Primitive> primitives;
         int32_t skin;
+        uint32_t index;
     };
 
     struct Camera
@@ -172,7 +173,7 @@ namespace glTF
                 __declspec(align(16)) float translation[3];
             };
         };
-        int32_t linearIdx; // Assists with mapping scene nodes to flat arrays
+        uint32_t linearIdx; // Assists with mapping scene nodes to flat arrays
     };
 
     struct Skin

@@ -45,7 +45,6 @@ namespace Graphics
 
     extern HWND ghWnd;
     extern Microsoft::WRL::ComPtr<ID3D12Device> gDevice;
-    extern DescriptorAllocator gDescriptorAllocator[];
 
     extern D3D_FEATURE_LEVEL gD3DFeatureLevel;
     extern bool gTypedUAVLoadSupport_R11G11B10_FLOAT; // assume false

@@ -138,7 +138,7 @@ void CommandQueueManager::SelectQueueEvent()
 {
     ZoneScoped;
 
-    //mGraphicsQueue.SelectQueueEvent();
+    mGraphicsQueue.SelectQueueEvent();
     mComputeQueue.SelectQueueEvent();
     mCopyQueue.SelectQueueEvent();
 }

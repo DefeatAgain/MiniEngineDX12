@@ -5,8 +5,12 @@ void GpuBuffer::Destroy()
 {
 	GpuResource::Destroy();
 
-	Graphics::DeAllocateDescriptor(mUAV, 1);
-	Graphics::DeAllocateDescriptor(mSRV, 1);
+	mBufferSize = mElementSize = mElementCount = 0;
+
+	if (mUAV)
+		Graphics::DeAllocateDescriptor(mUAV, 1);
+	if (mSRV)
+		Graphics::DeAllocateDescriptor(mSRV, 1);
 }
 
 void GpuBuffer::Create(const std::wstring& name, uint32_t numElements, uint32_t elementSize, const void* initialData)

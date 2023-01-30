@@ -5,13 +5,16 @@ namespace glTF
 	class Asset;
 }
 
+class Scene;
+
 /*
 	Convert glTF Model To Renderer Model
 */
 namespace ModelConverter
 {
-	void BuildMaterials(glTF::Asset& asset);
+	void BuildMaterials(const glTF::Asset& asset);
 
-	void BuildAllMeshes(glTF::Asset& asset);
+	void BuildAllMeshes(const glTF::Asset& asset);
+
+	Scene* BuildScene(const glTF::Asset& asset);
 };
-

@@ -56,13 +56,6 @@ namespace Graphics
     D3D_FEATURE_LEVEL gD3DFeatureLevel = D3D_FEATURE_LEVEL_11_0;
     bool gTypedUAVLoadSupport_R11G11B10_FLOAT = false;
     bool gTypedUAVLoadSupport_R16G16B16A16_FLOAT = false;
-    DescriptorAllocator gDescriptorAllocator[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] =
-    {
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
-        D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-        D3D12_DESCRIPTOR_HEAP_TYPE_DSV
-    };
 
 
     // Check adapter support for DirectX Raytracing.
@@ -638,15 +631,5 @@ namespace Graphics
 #endif
 
         gDevice = nullptr;
-    }
-
-    DescriptorHandle AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE type, UINT count)
-    {
-        return gDescriptorAllocator[type].Allocate(count);
-    }
-
-    void DeAllocateDescriptor(DescriptorHandle& handle, UINT count)
-    {
-        handle.GetOwningAlloc().Deallocate(handle, count);
     }
 };

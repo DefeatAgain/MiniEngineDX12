@@ -20,6 +20,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glTF.cpp" />
+    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="MeshRenderer.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelConverter.cpp" />
     <ClCompile Include="Scene.cpp" />
@@ -29,6 +31,8 @@
     <ClInclude Include="glTF.h" />
     <ClInclude Include="InputLayouts.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelConverter.h" />
     <ClInclude Include="Scene.h" />

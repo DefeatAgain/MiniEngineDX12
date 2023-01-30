@@ -27,7 +27,7 @@ void glTF::Asset::ProcessNodes( json& nodes )
 
         node.flags = 0;
         node.mesh = nullptr;
-        node.linearIdx = -1;
+        node.linearIdx = it - nodes.MemberBegin();
 
         if (thisNode.HasMember("camera"))
         {
@@ -216,6 +216,7 @@ void glTF::Asset::ProcessMeshes( json& meshes, json& accessors )
 
         m_meshes[curMesh].primitives.resize(primitives.GetArray().Size());
         m_meshes[curMesh].skin = -1;
+        m_meshes[curMesh].index = meshIt - meshes.MemberBegin();
 
         uint32_t curSubMesh = 0;
         for (json::ConstMemberIterator primIt = primitives.MemberBegin(); primIt != primitives.MemberEnd(); ++primIt, ++curSubMesh)

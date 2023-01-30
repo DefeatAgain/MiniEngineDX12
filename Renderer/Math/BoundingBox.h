@@ -47,6 +47,19 @@ namespace Math
         Vector3 GetCenter() const { return (m_min + m_max) * 0.5f; }
         Vector3 GetDimensions() const { return Max(m_max - m_min, Vector3(kZero)); }
 
+        static AxisAlignedBox CreateFromSphere(const BoundingSphere& sh)
+        {
+            Vector3 spCenter = sh.GetCenter();
+            Vector3 shRadius = sh.GetRadius();
+
+            Vector3 Min = spCenter - shRadius;
+            Vector3 Max = spCenter + shRadius;
+
+            assert(XMVector3LessOrEqual(Min, Max));
+
+            return AxisAlignedBox(Min, Max);
+        }
+
     private:
 
         Vector3 m_min;

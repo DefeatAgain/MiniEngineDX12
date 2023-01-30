@@ -118,6 +118,12 @@ public:
     UploadBuffer() : mMappedBuffer(nullptr), mBufferSize(0) {}
     virtual ~UploadBuffer() { Destroy(); }
 
+    virtual void Destroy() override
+    {
+        GpuResource::Destroy();
+        mBufferSize = 0;
+    }
+
     void Create(const std::wstring& name, size_t bufferSize);
 
     void* Map();

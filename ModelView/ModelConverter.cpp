@@ -4,7 +4,14 @@
 #include "Texture.h"
 #include "SamplerManager.h"
 #include "Model.h"
+#include "Mesh.h"
+#include "Scene.h"
+#include "Math/BoundingSphere.h"
+#include "Math/VectorMath.h"
 #include "Utils/DirectXMesh/DirectXMesh.h"
+#include "Utils/ThreadPoolExecutor.h"
+
+static std::unique_ptr<Scene> sScenePtr;
 
 static DXGI_FORMAT AccessorFormat(const glTF::Accessor& accessor)
 {
@@ -40,9 +47,13 @@ static DXGI_FORMAT AccessorFormat(const glTF::Accessor& accessor)
 
 struct GeometryData
 {
-    std::unique_ptr<std::vector<byte>> VB;
-    std::unique_ptr<std::vector<byte>> depthVB;
-    std::unique_ptr<byte> IB;
+    std::unique_ptr<byte[]> VB;
+    std::unique_ptr<byte[]> depthVB;
+    std::unique_ptr<byte[]> IB;
+    uint32_t vertexBufferSize;
+    uint32_t depthVertexBufferSize;
+    uint32_t indexBufferSize;
+    uint32_t vertexCount;
 };
 
 namespace ModelConverter
@@ -69,14 +80,14 @@ namespace ModelConverter
         }
     }
 
-	void BuildMaterials(glTF::Asset& asset)
+	void BuildMaterials(const glTF::Asset& asset)
 	{
         MaterialManager* matMgr = MaterialManager::GetOrCreateInstance();
         matMgr->Reserve(asset.m_materials.size());
 
         for (uint32_t i = 0; i < asset.m_materials.size(); ++i)
         {
-            glTF::Material& gltfMat = asset.m_materials[i];
+            const glTF::Material& gltfMat = asset.m_materials[i];
             PBRMaterial& pbrMat = matMgr->AddMaterial<PBRMaterial>();
 
             pbrMat.mMaterialConstant.baseColorFactor[0] = gltfMat.baseColorFactor[0];
@@ -122,17 +133,18 @@ namespace ModelConverter
         }
 	}
 
-    GeometryData BuildSubMesh(glTF::Primitive& primitive, SubMesh& subMesh, const Math::Matrix4& toObjectRoot)
+    GeometryData BuildSubMesh(const glTF::Primitive& primitive, SubMesh& subMesh)
     {
         ASSERT(primitive.attributes[glTF::Primitive::kPosition] != nullptr, "Must have POSITION");
-        uint32_t vertexCount = primitive.attributes[glTF::Primitive::kPosition]->count;
         GeometryData geoData;
+        uint32_t vertexCount = primitive.attributes[glTF::Primitive::kPosition]->count;
+        geoData.vertexCount = vertexCount;
 
         // process index
         bool b32BitIndices;
         uint32_t maxIndex;
         uint32_t indexCount;
-        std::unique_ptr<byte> newIndices;
+        std::unique_ptr<byte[]> newIndices;
         if (primitive.indices != nullptr)
         {
             void* indicesPtr = primitive.indices->dataPtr;
@@ -156,22 +168,23 @@ namespace ModelConverter
 
             // Index Optimize
             uint32_t nFaces = indexCount / 3;
-            std::unique_ptr<byte> newIndices = std::make_unique<byte>(perIndexSize * nFaces);
-            std::unique_ptr<byte> faceRemap = std::make_unique<byte>(nFaces * sizeof(uint32_t));
+            geoData.indexBufferSize = perIndexSize * indexCount;
+            newIndices = std::make_unique<byte[]>(geoData.indexBufferSize);
+            std::unique_ptr<byte[]> faceRemap = std::make_unique<byte[]>(nFaces * sizeof(uint32_t));
             if (b32BitIndices) // must be 32Bit
             {
-                ASSERT(OptimizeFacesLRU((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), 64));
-                ASSERT(ReorderIB((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), (uint32_t*)newIndices.get()));
+                CheckHR(OptimizeFacesLRU((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), 64));
+                CheckHR(ReorderIB((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), (uint32_t*)newIndices.get()));
             }
             else if (primitive.indices->componentType == glTF::Accessor::kUnsignedShort)
             {
-                ASSERT(OptimizeFacesLRU((uint16_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), 64));
-                ASSERT(ReorderIB((uint16_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), (uint16_t*)newIndices.get()));
+                CheckHR(OptimizeFacesLRU((uint16_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), 64));
+                CheckHR(ReorderIB((uint16_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), (uint16_t*)newIndices.get()));
             }
             else
             {
-                ASSERT(OptimizeFacesLRU((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), 64));
-                ASSERT(ReorderIB((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), (uint16_t*)newIndices.get()));
+                CheckHR(OptimizeFacesLRU((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), 64));
+                CheckHR(ReorderIB((uint32_t*)primitive.indices->dataPtr, nFaces, (uint32_t*)faceRemap.get(), (uint16_t*)newIndices.get()));
             }
         }
         else
@@ -180,11 +193,11 @@ namespace ModelConverter
 
             indexCount = vertexCount * 3;
             maxIndex = indexCount - 1;
-            std::unique_ptr<byte> newIndices;
             if (indexCount > 0xFFFF)
             {
                 b32BitIndices = true;
-                newIndices = std::make_unique<byte>(4 * indexCount);
+                geoData.indexBufferSize = 4 * indexCount;
+                newIndices = std::make_unique<byte[]>(geoData.indexBufferSize);
                 uint32_t* tmp = (uint32_t*)newIndices.get();
                 for (uint32_t i = 0; i < indexCount; ++i)
                     tmp[i] = i;
@@ -192,7 +205,8 @@ namespace ModelConverter
             else
             {
                 b32BitIndices = false;
-                newIndices = std::make_unique<byte>(2 * indexCount);
+                geoData.indexBufferSize = 2 * indexCount;
+                newIndices = std::make_unique<byte[]>(geoData.indexBufferSize);
                 uint16_t* tmp = (uint16_t*)newIndices.get();
                 for (uint16_t i = 0; i < indexCount; ++i)
                     tmp[i] = i;
@@ -200,6 +214,7 @@ namespace ModelConverter
         }
         ASSERT(maxIndex > 0 && newIndices);
         geoData.IB.swap(newIndices);
+
 
         // process vertex
         const bool HasNormals = primitive.attributes[glTF::Primitive::kNormal] != nullptr;
@@ -264,27 +279,22 @@ namespace ModelConverter
             using namespace Math;
             // Local space bounds
             Vector3 sphereCenterLS = (Vector3(*(XMFLOAT3*)primitive.minPos) + Vector3(*(XMFLOAT3*)primitive.maxPos)) * 0.5f;
-            Vector3 sphereCenterOS = Vector3(toObjectRoot * Vector4(sphereCenterLS));
             Scalar maxRadiusLSSq(kZero);
-            Scalar maxRadiusOSSq(kZero);
-
-            subMesh.m_BBoxLS = AxisAlignedBox(kZero);
-            subMesh.m_BBoxOS = AxisAlignedBox(kZero);
+            AxisAlignedBox aabbLS = AxisAlignedBox(kZero);
 
             for (uint32_t v = 0; v < vertexCount/*maxIndex*/; ++v)
             {
                 Vector3 positionLS = Vector3(position[v]);
-                Vector3 positionOS = Vector3(toObjectRoot * Vector4(positionLS));
 
-                subMesh.m_BBoxLS.AddPoint(positionLS);
-                subMesh.m_BBoxOS.AddPoint(positionOS);
+                aabbLS.AddPoint(positionLS);
 
                 maxRadiusLSSq = Max(maxRadiusLSSq, LengthSquare(sphereCenterLS - positionLS));
-                maxRadiusOSSq = Max(maxRadiusOSSq, LengthSquare(sphereCenterOS - positionOS));
             }
 
-            subMesh.m_BSLS = Math::BoundingSphere(sphereCenterLS, Sqrt(maxRadiusLSSq));
-            subMesh.m_BSOS = Math::BoundingSphere(sphereCenterOS, Sqrt(maxRadiusOSSq));
+            XMStoreFloat3((XMFLOAT3*)subMesh.bounds, sphereCenterLS);
+            subMesh.bounds[3] = maxRadiusLSSq;
+            XMStoreFloat3(&subMesh.minPos, aabbLS.GetMin());
+            XMStoreFloat3(&subMesh.maxPos, aabbLS.GetMax());
         }
 
         if (HasNormals)
@@ -396,8 +406,9 @@ namespace ModelConverter
         ComputeInputLayout(layout, offsets, strides);
         uint32_t stride = strides[0];
 
-        geoData.VB = std::make_unique<std::vector<byte>>(stride * vertexCount);
-        CheckHR(vbw.AddStream(geoData.VB->data(), vertexCount, 0, stride));
+        geoData.vertexBufferSize = stride * vertexCount;
+        geoData.VB = std::make_unique<byte[]>(geoData.vertexBufferSize);
+        CheckHR(vbw.AddStream(geoData.VB.get(), vertexCount, 0, stride));
 
         vbw.Write(position.get(), "POSITION", 0, vertexCount);
         vbw.Write(normal.get(), "NORMAL", 0, vertexCount, true);
@@ -425,8 +436,10 @@ namespace ModelConverter
         dvbw.Initialize(depthLayout);
         ComputeInputLayout(depthLayout, offsets, strides);
         uint32_t depthStride = strides[0];
-        geoData.depthVB = std::make_unique<std::vector<byte>>(depthStride * vertexCount);
-        CheckHR(dvbw.AddStream(geoData.depthVB->data(), vertexCount, 0, depthStride));
+
+        geoData.depthVertexBufferSize = depthStride * vertexCount;
+        geoData.depthVB = std::make_unique<byte[]>(geoData.depthVertexBufferSize);
+        CheckHR(dvbw.AddStream(geoData.depthVB.get(), vertexCount, 0, depthStride));
 
         dvbw.Write(position.get(), "POSITION", 0, vertexCount);
         if (primitive.material->alphaTest && texcoords[primitive.material->baseColorUV])
@@ -435,32 +448,169 @@ namespace ModelConverter
         }
 
         ASSERT(primitive.material->index < 0x8000, "Only 15-bit material indices allowed");
-
-        subMesh.vertexStride = (uint16_t)stride;
+        ASSERT(stride <= 0xFF && depthStride <= 0xFF);
+        subMesh.vertexStride = (uint8_t)stride;
+        subMesh.depthVertexStride = (uint8_t)depthStride;
         subMesh.index32 = b32BitIndices;
         subMesh.materialIdx = primitive.material->index;
         subMesh.indexCount = indexCount;
+        subMesh.uniqueMaterialIdx = -1;
 
         return geoData;
     }
 
-    void BuildAllMeshes(glTF::Asset& asset)
+    void BuildAllMeshes(const glTF::Asset& asset)
     {
-        Mesh& mesh = Mesh::sAllMeshs.emplace_back();
-        std::vector<byte> VB;
-        std::vector<byte> DepthVB;
-        std::vector<byte> IB;
+        using namespace Math;
 
         for (size_t i = 0; i < asset.m_meshes.size(); i++)
         {
-            glTF::Mesh& gltfMesh = asset.m_meshes[i];
-            mesh.subMeshes.reserve(gltfMesh.primitives.size());
+            const glTF::Mesh& gltfMesh = asset.m_meshes[i];
+            Mesh& mesh = MeshManager::GetInstance()->AddMesh();
+            mesh.subMeshes = std::make_unique<SubMesh[]>(gltfMesh.primitives.size());
+            mesh.subMeshCount = gltfMesh.primitives.size();
+
+            std::vector<std::future<GeometryData>> futureGeoData;
+            std::vector<GeometryData> futureGeoData1;
             for (size_t pi = 0; pi < gltfMesh.primitives.size(); pi++)
             {
-                SubMesh& subMesh = mesh.subMeshes.emplace_back();
+                futureGeoData.emplace_back(Utility::gThreadPoolExecutor.Submit(
+                    &BuildSubMesh, std::cref(gltfMesh.primitives[pi]), std::ref(mesh.subMeshes[pi])));
+            }
+            futureGeoData1.resize(futureGeoData.size());
 
-                BuildSubMesh(gltfMesh.primitives[pi], subMesh);
+            // calc all submesh size
+            uint32_t startIndex = 0;
+            uint32_t baseVertex = 0;
+            uint32_t totalIndexSize = 0;
+            uint32_t totalVertexSize = 0;
+            uint32_t totaldepthVertexSize = 0;
+
+            Math::AxisAlignedBox boundingBox;
+            Math::BoundingSphere boundingSphere;
+            for (size_t fi = 0; fi < futureGeoData.size(); fi++)
+            {
+                const GeometryData& geoData = futureGeoData1.emplace_back(futureGeoData[fi].get());
+                SubMesh& submesh = mesh.subMeshes[fi];
+                submesh.baseVertex = baseVertex;
+                submesh.startIndex = startIndex;
+                baseVertex += geoData.vertexCount;
+                startIndex += submesh.indexCount;
+                totalIndexSize += geoData.indexBufferSize;
+                totalVertexSize += geoData.vertexBufferSize;
+                totaldepthVertexSize += geoData.depthVertexBufferSize;
+
+                Math::AxisAlignedBox aabbSub(submesh.minPos, submesh.maxPos);
+                Math::BoundingSphere shSub((const XMFLOAT4*)submesh.bounds);
+                boundingBox.AddBoundingBox(aabbSub);
+                boundingSphere.Union(shSub);
+            }
+            DirectX::XMStoreFloat4((XMFLOAT4*)mesh.bounds, (Vector4)boundingSphere);
+            DirectX::XMStoreFloat3(&mesh.minPos, (Vector4)boundingBox.GetMin());
+            DirectX::XMStoreFloat3(&mesh.maxPos, (Vector4)boundingBox.GetMax());
+
+            // copy all buffers to a single buffer
+            mesh.sizeVB = totalVertexSize;
+            mesh.sizeDepthVB = totaldepthVertexSize;
+            mesh.sizeIB = totalIndexSize;
+            mesh.VB = std::make_unique<byte[]>(totalVertexSize);
+            mesh.DepthVB = std::make_unique<byte[]>(totaldepthVertexSize);
+            mesh.IB = std::make_unique<byte[]>(totalIndexSize);
+            uint32_t vertexBufferOffset = 0;
+            uint32_t indexBufferOffset = 0;
+            uint32_t depthVertexBufferOffset = 0;
+            for (size_t fi = 0; fi < futureGeoData.size(); fi++)
+            {
+                const GeometryData& geoData = futureGeoData1[fi];
+                CopyMemory(mesh.VB.get() + vertexBufferOffset, geoData.VB.get(), geoData.vertexBufferSize);
+                CopyMemory(mesh.DepthVB.get() + depthVertexBufferOffset, geoData.depthVB.get(), geoData.depthVertexBufferSize);
+                CopyMemory(mesh.IB.get() + indexBufferOffset, geoData.IB.get(), geoData.indexBufferSize);
+                vertexBufferOffset += geoData.vertexBufferSize;
+                depthVertexBufferOffset += geoData.depthVertexBufferSize;
+                indexBufferOffset += geoData.indexBufferSize;
             }
         }
+
+        MeshManager::GetInstance()->UpdateMeshes();
+    }
+
+    void WalkGraph(
+        std::vector<Model>& sceneModels,
+        const std::vector<glTF::Node*>& siblings,
+        uint32_t curIndex,
+        const Math::Matrix4& xform
+    )
+    {
+        using namespace Math;
+
+        size_t numSiblings = siblings.size();
+        for (size_t i = 0; i < numSiblings; ++i)
+        {
+            glTF::Node* curNode = siblings[i];
+            Model& model = sceneModels[curIndex];
+            model.mHasChildren = false;
+            model.mCurIndex = curNode->linearIdx;
+            model.mParentIndex = curIndex;
+            
+            if (curNode->hasMatrix)
+            {
+                CopyMemory((float*)&model.mXform, curNode->matrix, sizeof(curNode->matrix));
+            }
+            else
+            {
+                Quaternion rot;
+                XMFLOAT3 scale;
+                CopyMemory((float*)&rot, curNode->rotation, sizeof(curNode->rotation));
+                CopyMemory((float*)&scale, curNode->scale, sizeof(curNode->scale));
+                model.mXform = Matrix4(
+                    Matrix3(rot) * Matrix3::MakeScale(scale),
+                    Vector3(*(const XMFLOAT3*)curNode->translation)
+                );
+            }
+
+            const Matrix4 LocalXform = xform * model.mXform;
+
+            if (!curNode->pointsToCamera && curNode->mesh != nullptr)
+            {
+                model.mMesh = GET_MESH(curNode->mesh->index);
+
+                Scalar scaleXSqr = LengthSquare((Vector3)xform.GetX());
+                Scalar scaleYSqr = LengthSquare((Vector3)xform.GetY());
+                Scalar scaleZSqr = LengthSquare((Vector3)xform.GetZ());
+                Scalar sphereScale = Sqrt(Max(Max(scaleXSqr, scaleYSqr), scaleZSqr));
+
+                Vector3 sphereCenter(*(Math::XMFLOAT3*)model.mMesh->bounds);
+                sphereCenter = (Vector3)(LocalXform * sphereCenter);
+                Scalar sphereRadius = sphereScale * model.mMesh->bounds[3];
+                model.m_BSOS = Math::BoundingSphere(sphereCenter, sphereRadius);
+                model.m_BBoxOS = AxisAlignedBox::CreateFromSphere(model.m_BSOS);
+            }
+
+            if (curNode->children.size() > 0)
+            {
+                model.mHasChildren = true;
+                WalkGraph(sceneModels, curNode->children, model.mCurIndex, LocalXform);
+            }
+
+            // Are there more siblings?
+            if (i + 1 < numSiblings)
+            {
+                model.mHasSiblings = true;
+            }
+        }
+    }
+
+    Scene* BuildScene(const glTF::Asset& asset)
+    {
+        if (sScenePtr)
+            return sScenePtr.get();
+        
+        sScenePtr = std::make_unique<Scene>();
+        sScenePtr->mModels.resize(asset.m_nodes.size());
+
+        const glTF::Scene* gltfScene = asset.m_scene; // only one scene
+        WalkGraph(sScenePtr->mModels, gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
+
+        return sScenePtr.get();
     }
 };

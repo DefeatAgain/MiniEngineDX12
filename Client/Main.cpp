@@ -2,11 +2,11 @@
 
 namespace GameApp
 {
-	class TestGameApp : public IGameApp
+	class SceneGameApp : public IGameApp
 	{
-		virtual void Start() {}
+		virtual void Start() override;
 
-		virtual void RegisterContext() {}
+		virtual void RegisterContext() override;
 
 		virtual void Update(float deltaTime) {};
 
@@ -14,6 +14,17 @@ namespace GameApp
 
 		virtual void Render() {}
 	};
+
+	void SceneGameApp::Start()
+	{
+
+	}
+
+	void SceneGameApp::RegisterContext()
+	{
+
+	}
 }
 
-CREATE_APPLICATION(GameApp::TestGameApp);
+CREATE_APPLICATION(GameApp::SceneGameApp);
+

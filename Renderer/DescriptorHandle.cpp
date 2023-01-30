@@ -9,7 +9,7 @@ void DescriptorAllocator::Deallocate(DescriptorHandle& handle, uint32_t count)
     constexpr uint32_t firstLayerSize = MAX_DESCRIPTOR_HEAP_SIZE / perNodeSize;
     ASSERT(count > 0 && count <= firstLayerSize);
 
-    SubHeap*& subHeap = handle.mOwningHeap;
+    SubHeap* subHeap = GetSubHeap(handle.mOwningHeapIndex);
     ASSERT(subHeap);
 
     if (count > 1)
@@ -26,7 +26,8 @@ void DescriptorAllocator::Deallocate(DescriptorHandle& handle, uint32_t count)
         std::this_thread::yield();
 
     uint32_t startLayerNodeIdx = (1 << startLayerIdx) - 1;
-    uint32_t offset = (handle.GetCpuPtr() - subHeap->mCpuStartHandle.ptr) / subHeap->mDescriptorSize / count; // Calc Address Offset
+    //uint32_t offset = (handle.GetCpuPtr() - subHeap->mCpuStartHandle.ptr) / subHeap->mDescriptorSize / count; // Calc Address Offset
+    uint32_t offset = (handle.GetCpuPtr() - subHeap->mCpuStartHandle.ptr) / mDescriptorSize / count; // Calc Address Offset
     uint32_t nodeIdx = startLayerNodeIdx + offset / perNodeSize; // Tree Node Index
     uint32_t bitIdx = offset % perNodeSize; // BitSet Index
 
@@ -41,11 +42,10 @@ void DescriptorAllocator::Deallocate(DescriptorHandle& handle, uint32_t count)
         subHeap->mNumReleasedHandles = 0;
         auto maxHandleIter = std::max_element(mDescriptorHeapPool.cbegin(), mDescriptorHeapPool.cend(),
             [](auto& p1, auto& p2) { return p1->mNumRemainHandles > p2->mNumRemainHandles; });
-        mCurrentHeap = *maxHandleIter;
+        mCurrentHeapIndex = std::distance(mDescriptorHeapPool.cbegin(), maxHandleIter);
     }
 
-    handle.mOffset = 0;
-    handle.mOwningHeap = nullptr;
+    handle.mOffset = UNKNOWN_OFFSET;
 }
 
 DescriptorHandle DescriptorAllocator::Allocate(uint32_t count)
@@ -69,14 +69,14 @@ DescriptorHandle DescriptorAllocator::Allocate(uint32_t count)
     while (!lock1.try_lock())
         std::this_thread::yield();
 
-    if (!mCurrentHeap || mCurrentHeap->mNumRemainHandles < count)
-        mCurrentHeap = AllocNewHeap();
+    if (mCurrentHeapIndex == (uint8_t)-1 || mDescriptorHeapPool[mCurrentHeapIndex]->mNumRemainHandles < count)
+        mCurrentHeapIndex = AllocNewHeap();
 
     DescriptorHandle newHandle = AllocateLayer(startLayerNodeIdx, totalNodeSize, count);
     if (newHandle)
         return newHandle;
 
-    mCurrentHeap = AllocNewHeap();
+    mCurrentHeapIndex = AllocNewHeap();
     return AllocateLayer(startLayerNodeIdx, totalNodeSize, count);
 }
 
@@ -84,23 +84,31 @@ DescriptorHandle DescriptorAllocator::AllocateLayer(uint32_t startLayerNodeIdx, 
 {
     constexpr uint32_t perNodeSize = (sizeof(BITMAP_TYPE) * 8);
 
-    if (mCurrentHeap->mBitMap.size() < totalNodeSize) // Fill tree nodes
-        mCurrentHeap->mBitMap.resize(totalNodeSize);
+    SubHeap* subHeap = mDescriptorHeapPool[mCurrentHeapIndex];
+
+    if (subHeap->mBitMap.size() < totalNodeSize) // Fill tree nodes
+        subHeap->mBitMap.resize(totalNodeSize);
 
     size_t offsetFromHeap = 0;
     for (uint32_t i = startLayerNodeIdx, j = 0; i < totalNodeSize; i++, j++) // iter curlayer node
     {
         unsigned long freeIdx = 0;
-        if (_BitScanForward(&freeIdx, ~mCurrentHeap->mBitMap[i]))
+        if (_BitScanForward(&freeIdx, ~subHeap->mBitMap[i]))
         {
             offsetFromHeap = (j * perNodeSize + freeIdx) * alignedCount;
-            mCurrentHeap->mNumRemainHandles -= alignedCount;
-            mCurrentHeap->mBitMap[i] |= 1 << freeIdx;
-            TreeShiftSetBit(mCurrentHeap->mBitMap, i, freeIdx);
+            subHeap->mNumRemainHandles -= alignedCount;
+            subHeap->mBitMap[i] |= 1 << freeIdx;
+            TreeShiftSetBit(subHeap->mBitMap, i, freeIdx);
             break;
         }
     }
-    return DescriptorHandle(offsetFromHeap, mCurrentHeap);
+    return DescriptorHandle(offsetFromHeap, mCurrentHeapIndex, mType);
+}
+
+DescriptorAllocator::DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE heapType) :
+    mType(heapType), mCurrentHeapIndex(-1)
+{
+    mDescriptorSize = Graphics::gDevice->GetDescriptorHandleIncrementSize(mType);
 }
 
 void DescriptorAllocator::Clear()
@@ -113,11 +121,11 @@ void DescriptorAllocator::Clear()
         delete subHeap;
     }
 
-    mCurrentHeap = nullptr;
+    mCurrentHeapIndex = -1;
     mDescriptorHeapPool.clear();
 }
 
-DescriptorAllocator::SubHeap* DescriptorAllocator::AllocNewHeap()
+uint8_t DescriptorAllocator::AllocNewHeap()
 {
     D3D12_DESCRIPTOR_HEAP_DESC desc;
     desc.Type = mType;
@@ -132,14 +140,13 @@ DescriptorAllocator::SubHeap* DescriptorAllocator::AllocNewHeap()
     CheckHR(Graphics::gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(subAllocator->mDescriptorHeap.GetAddressOf())));
     subAllocator->mCpuStartHandle = subAllocator->mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
     subAllocator->mGpuStartHandle = subAllocator->mDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-    subAllocator->mDescriptorSize = Graphics::gDevice->GetDescriptorHandleIncrementSize(mType);
 
     //constexpr uint32_t perNodeSize = (sizeof(BITMAP_TYPE) * 8);
     //constexpr uint32_t firstLayerSize = MAX_DESCRIPTOR_HEAP_SIZE / perNodeSize;
     //unsigned long maxLayerIdx = 0;
     //_BitScanForward(&maxLayerIdx, firstLayerSize);
     //subAllocator->mPerLayerRemainHandles.resize(maxLayerIdx + 1);
-    return subAllocator;
+    return mDescriptorHeapPool.size() - 1;
 }
 
 void DescriptorAllocator::TreeShiftSetBit(std::vector<uint32_t>& bitMap, int startIdx, size_t startBitIdx)

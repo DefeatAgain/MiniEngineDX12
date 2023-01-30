@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-struct alignas(256) PBRMaterialConstants
+struct PBRMaterialConstants
 {
     float baseColorFactor[4]; // default=[1,1,1,1]
     float emissiveFactor[3]; // default=[0,0,0]
@@ -30,4 +30,16 @@ struct alignas(256) PBRMaterialConstants
             uint32_t alphaRef : 16; // half float
         };
     };
+};
+
+
+struct GlobalConstants
+{
+    Math::Matrix4 ViewProjMatrix;
+    Math::Matrix4 SunShadowMatrix;
+    Math::Vector3 CameraPos;
+    Math::Vector3 SunDirection;
+    Math::Vector3 SunIntensity;
+    float IBLRange;
+    float IBLBias;
 };
