@@ -32,7 +32,7 @@ namespace ModelRenderer
 
     //DescriptorHeap s_TextureHeap;
     //DescriptorHeap s_SamplerHeap;
-    inline std::map<uint32_t, GraphicsPipelineState> gPSOs;
+    inline std::vector<GraphicsPipelineState> gPSOs;
 
     inline RootSignature* mRootSig;
     inline GraphicsPipelineState* mSkyboxPSO;
@@ -42,7 +42,7 @@ namespace ModelRenderer
 
     void Initialize();
 
-    uint16_t GetPso();
+    uint16_t GetPsoIndex(ePSOFlags psoFlags, bool isDepth);
 }
 
 class MeshRenderer

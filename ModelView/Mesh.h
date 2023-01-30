@@ -26,7 +26,6 @@ struct SubMesh
     uint8_t vertexStride;
     uint8_t depthVertexStride;
     uint16_t uniqueMaterialIdx;
-    uint16_t psoIndex;
 };
 
 

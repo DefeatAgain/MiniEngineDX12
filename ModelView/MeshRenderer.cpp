@@ -5,6 +5,9 @@
 
 namespace ModelRenderer
 {
+    std::map<size_t, uint32_t> sPSOIndices;
+
+
     void Initialize()
     {
         Graphics::AddRSSTask([]()
@@ -56,8 +59,6 @@ void MeshRenderer::AddMesh(const Mesh& mesh, const Model* model, float distance,
         bool alphaBlend = (subMesh.psoFlags & ePSOFlags::kAlphaBlend) == ePSOFlags::kAlphaBlend;
         bool alphaTest = (subMesh.psoFlags & ePSOFlags::kAlphaTest) == ePSOFlags::kAlphaTest;
 
-        uint64_t depthPSO = alphaTest ? 1 : 0;
-
         union float_or_int { float f; uint32_t u; } dist;
 
         dist.f = Math::Max(distance, 0.0f);
@@ -68,7 +69,7 @@ void MeshRenderer::AddMesh(const Mesh& mesh, const Model* model, float distance,
                 return;
 
             key.passID = kZPass;
-            key.psoIdx = depthPSO;
+            key.psoIdx = ModelRenderer::GetPsoIndex(subMesh.psoFlags, true);
             key.key = dist.u;
             m_SortKeys.push_back(key.value);
             m_PassCounts[kZPass]++;
@@ -76,7 +77,7 @@ void MeshRenderer::AddMesh(const Mesh& mesh, const Model* model, float distance,
         else if (subMesh.psoFlags & ePSOFlags::kAlphaBlend)
         {
             key.passID = kTransparent;
-            key.psoIdx = subMesh.psoIndex;
+            key.psoIdx = ModelRenderer::GetPsoIndex(subMesh.psoFlags, false);
             key.key = ~dist.u;
             m_SortKeys.push_back(key.value);
             m_PassCounts[kTransparent]++;
@@ -84,13 +85,13 @@ void MeshRenderer::AddMesh(const Mesh& mesh, const Model* model, float distance,
         else if (ModelRenderer::gIsPreZ || alphaTest)
         {
             key.passID = kZPass;
-            key.psoIdx = depthPSO;
+            key.psoIdx = ModelRenderer::GetPsoIndex(subMesh.psoFlags, true);;
             key.key = dist.u;
             m_SortKeys.push_back(key.value);
             m_PassCounts[kZPass]++;
 
             key.passID = kOpaque;
-            key.psoIdx = subMesh.psoIndex + 1;
+            key.psoIdx = ModelRenderer::GetPsoIndex(subMesh.psoFlags, false);;
             key.key = dist.u;
             m_SortKeys.push_back(key.value);
             m_PassCounts[kOpaque]++;
@@ -98,7 +99,7 @@ void MeshRenderer::AddMesh(const Mesh& mesh, const Model* model, float distance,
         else
         {
             key.passID = kOpaque;
-            key.psoIdx = subMesh.psoIndex;
+            key.psoIdx = ModelRenderer::GetPsoIndex(subMesh.psoFlags, true);;
             key.key = dist.u;
             m_SortKeys.push_back(key.value);
             m_PassCounts[kOpaque]++;
