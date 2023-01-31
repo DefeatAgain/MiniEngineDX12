@@ -1,6 +1,13 @@
 #pragma once
 #include <cstdint>
 
+struct MeshConstants
+{
+    Math::Matrix4 World;         // Object to world
+    Math::Matrix3 WorldIT;       // Object normal to world normal
+};
+
+
 struct PBRMaterialConstants
 {
     float baseColorFactor[4]; // default=[1,1,1,1]

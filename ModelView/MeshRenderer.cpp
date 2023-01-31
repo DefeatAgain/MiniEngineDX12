@@ -6,6 +6,7 @@
 namespace ModelRenderer
 {
     std::map<size_t, uint32_t> sPSOIndices;
+    GraphicsPipelineState* mDefaultPSO; // Not finalized.  Used as a template.
 
 
     void Initialize()
@@ -43,6 +44,55 @@ namespace ModelRenderer
         //m_DefaultPSO.SetRenderTargetFormats(1, &ColorFormat, DepthFormat);
         //m_DefaultPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
         //m_DefaultPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
+    }
+
+    uint16_t GetPsoIndex(ePSOFlags psoFlags, bool isDepth)
+    {
+        GraphicsPipelineState* ColorPSO;
+        if (isDepth)
+        {
+            std::wstring psoName;
+            if (psoFlags & kAlphaTest)
+                psoName = L"MeshRenderer: Depth PSO With alpha";
+            else 
+                psoName = L"MeshRenderer: Depth PSO";
+            ColorPSO = GET_GPSO(psoName);
+        }
+        else
+            ColorPSO = GET_GPSO(std::wstring(L"MeshRenderer: PSO ") + std::to_wstring(psoFlags));
+
+        *ColorPSO = *mDefaultPSO;
+
+        uint16_t Requirements = kHasPosition | kHasNormal;
+        ASSERT((psoFlags & Requirements) == Requirements);
+
+        std::vector<D3D12_INPUT_ELEMENT_DESC> vertexLayout;
+        if (isDepth)
+        {
+            vertexLayout.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT });
+            if (psoFlags & kAlphaTest)
+                vertexLayout.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R8G8_UNORM,     0, D3D12_APPEND_ALIGNED_ELEMENT });
+        }
+        else
+        {
+            if (psoFlags & kHasPosition)
+                vertexLayout.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT });
+            if (psoFlags & kHasNormal)
+                vertexLayout.push_back({ "NORMAL",   0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, D3D12_APPEND_ALIGNED_ELEMENT });
+            if (psoFlags & kHasTangent)
+                vertexLayout.push_back({ "TANGENT",  0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, D3D12_APPEND_ALIGNED_ELEMENT });
+
+            if (psoFlags & kHasUV0)
+                vertexLayout.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R8G8_UNORM,       0, D3D12_APPEND_ALIGNED_ELEMENT });
+            if (psoFlags & kHasUV1)
+                vertexLayout.push_back({ "TEXCOORD", 1, DXGI_FORMAT_R8G8_UNORM,       1, D3D12_APPEND_ALIGNED_ELEMENT });
+            if (psoFlags & kHasUV2)
+                vertexLayout.push_back({ "TEXCOORD", 2, DXGI_FORMAT_R8G8_UNORM,       0, D3D12_APPEND_ALIGNED_ELEMENT });
+            if (psoFlags & kHasUV3)
+                vertexLayout.push_back({ "TEXCOORD", 3, DXGI_FORMAT_R8G8_UNORM,       0, D3D12_APPEND_ALIGNED_ELEMENT });
+        }
+        
+
     }
 }
 
@@ -105,7 +155,7 @@ void MeshRenderer::AddMesh(const Mesh& mesh, const Model* model, float distance,
             m_PassCounts[kOpaque]++;
         }
 
-        SortObject object = { model, &subMesh, materialCBV };
+        SortObject object = { model, &subMesh, materialCBV, meshCBV };
         m_SortObjects.push_back(object);
     }
 }

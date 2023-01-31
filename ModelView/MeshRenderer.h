@@ -36,9 +36,8 @@ namespace ModelRenderer
 
     inline RootSignature* mRootSig;
     inline GraphicsPipelineState* mSkyboxPSO;
-    inline GraphicsPipelineState* mDefaultPSO; // Not finalized.  Used as a template.
 
-    DescriptorHandle m_CommonTextures;
+    //DescriptorHandle m_CommonTextures;
 
     void Initialize();
 
@@ -110,6 +109,7 @@ private:
         const Model* model;
         const SubMesh* mesh;
         D3D12_GPU_VIRTUAL_ADDRESS materialCBV;
+        D3D12_GPU_VIRTUAL_ADDRESS meshCBV;
     };
 
     std::vector<SortObject> m_SortObjects;

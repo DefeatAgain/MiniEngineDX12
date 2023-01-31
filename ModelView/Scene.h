@@ -2,6 +2,10 @@
 #include "Camera.h"
 #include "CameraController.h"
 #include "Math/VectorMath.h"
+#include "GraphicsContext.h"
+#include "ConstantBuffer.h"
+#include "GpuBuffer.h"
+#include "Texture.h"
 
 class Model;
 class CameraController;
@@ -18,7 +22,7 @@ public:
 
     void RenderScene(const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor);
 
-    virtual void Update(float deltaTime) {}
+    virtual void Update(float deltaTime) override;
 
     virtual void Render() override;
 
@@ -31,8 +35,10 @@ public:
 	Math::Camera mSceneCamera;
     std::unique_ptr<CameraController> m_CameraController;
 	std::vector<Model> mModels;
+	std::vector<MeshConstants> mMeshConstants;
     GlobalConstants globalConstants;
 private:
+    UploadBuffer mMeshConstants;
     TextureRef mRadianceCubeMap;
     TextureRef mIrradianceCubeMap;
     float mSpecularIBLRange;

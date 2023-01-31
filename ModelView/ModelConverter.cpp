@@ -607,6 +607,7 @@ namespace ModelConverter
         
         sScenePtr = std::make_unique<Scene>();
         sScenePtr->mModels.resize(asset.m_nodes.size());
+        sScenePtr->mMeshConstants.resize(asset.m_nodes.size());
 
         const glTF::Scene* gltfScene = asset.m_scene; // only one scene
         WalkGraph(sScenePtr->mModels, gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
