@@ -2,13 +2,16 @@
 #include "CoreHeader.h"
 #include "Math/VectorMath.h"
 #include "Camera.h"
+#include "Material.h"
 #include "Utils/DebugUtils.h"
 
 class Mesh;
 class SubMesh;
 class Model;
+class Scene;
 class ColorBuffer;
 class DepthBuffer;
+class ShadowBuffer;
 class CameraController;
 class GraphicsCommandList;
 class GraphicsPipelineState;
@@ -17,31 +20,42 @@ struct GlobalConstants;
 
 namespace ModelRenderer
 {
-    enum RootBindings
+    enum ForwardRendererBindings
     {
         kMeshConstants,
         kMaterialConstants,
-        kMaterialSRVs,
-        kMaterialSamplers,
-        kCommonSRVs,
-        kCommonCBV,
+        kGlobalConstants,
+
+        kBaseColorTextureSRV,
+        kMetallicRoughnessTextureSRV,
+        kOcclusionTextureSRV,
+        kEmissiveTextureSRV,
+        kNormalTextureSRV,
+
+        kBaseColorTextureSampler,
+        kMetallicTextureSampler,
+        kOcclusionTextureSampler,
+        kEmissiveTextureSampler,
+        kNormalTextureSampler,
+
+        kRadianceIBLTexture,
+        kIrradianceIBLTexture,
+        kPreComputeGGXBRDFTexture,
+        kTexSunShadowTexture,
+
         kNumRootBindings
     };
 
-    inline bool gIsPreZ = true;
+    inline std::vector<GraphicsPipelineState*> sAllPSOs;
 
-    //DescriptorHeap s_TextureHeap;
-    //DescriptorHeap s_SamplerHeap;
-    inline std::vector<GraphicsPipelineState> gPSOs;
-
-    inline RootSignature* mRootSig;
-    inline GraphicsPipelineState* mSkyboxPSO;
-
-    //DescriptorHandle m_CommonTextures;
+    inline RootSignature* sForwardRootSig;
+    inline GraphicsPipelineState* sSkyboxPSO;
 
     void Initialize();
 
-    uint16_t GetPsoIndex(ePSOFlags psoFlags, bool isDepth);
+    uint16_t GetPsoIndex(ePSOFlags psoFlags);
+    uint16_t GetDepthPsoIndex(ePSOFlags psoFlags, bool isShadow);
+    ShadowBuffer& GetCurrentShadowBuffer();
 }
 
 class MeshRenderer
@@ -52,36 +66,35 @@ public:
 
     MeshRenderer(BatchType type)
     {
-        m_BatchType = type;
-        m_Camera = nullptr;
-        m_Viewport = {};
-        m_Scissor = {};
-        m_NumRTVs = 0;
-        m_DSV = nullptr;
-        m_SortObjects.clear();
-        m_SortKeys.clear();
-        std::memset(m_PassCounts, 0, sizeof(m_PassCounts));
-        m_CurrentPass = kZPass;
-        m_CurrentDraw = 0;
+        mBatchType = type;
+        mScene = nullptr;
+        mViewport = {};
+        mScissor = {};
+        mNumRTVs = 0;
+        mDepthBuffer = nullptr;
+        mSortObjects.clear();
+        mSortKeys.clear();
+        std::memset(mPassCounts, 0, sizeof(mPassCounts));
+        mCurrentPass = kZPass;
+        mCurrentDraw = 0;
     }
 
-    void SetCamera(const Math::BaseCamera& camera) { m_Camera = &camera; }
-    void SetViewport(const D3D12_VIEWPORT& viewport) { m_Viewport = viewport; }
-    void SetScissor(const D3D12_RECT& scissor) { m_Scissor = scissor; }
+    void SetScene(const Scene& scene) { mScene = &scene; }
+    void SetCamera(const Math::BaseCamera& camera) { mCamera = &camera; }
+    void SetViewport(const D3D12_VIEWPORT& viewport) { mViewport = viewport; }
+    void SetScissor(const D3D12_RECT& scissor) { mScissor = scissor; }
     void AddRenderTarget(ColorBuffer& RTV)
     {
-        ASSERT(m_NumRTVs < 8);
-        m_RTV[m_NumRTVs++] = &RTV;
+        ASSERT(mNumRTVs < 8);
+        mRenderTarges[mNumRTVs++] = &RTV;
     }
-    void SetDepthStencilTarget(DepthBuffer& DSV) { m_DSV = &DSV; }
+    void SetDepthStencilTarget(DepthBuffer& DSV) { mDepthBuffer = &DSV; }
 
-    const Math::Frustum& GetWorldFrustum() const { return m_Camera->GetWorldSpaceFrustum(); }
-    const Math::Frustum& GetViewFrustum() const { return m_Camera->GetViewSpaceFrustum(); }
-    const Math::Matrix4& GetViewMatrix() const { return m_Camera->GetViewMatrix(); }
+    const Math::Frustum& GetWorldFrustum() const { return mCamera->GetWorldSpaceFrustum(); }
+    const Math::Frustum& GetViewFrustum() const { return mCamera->GetViewSpaceFrustum(); }
+    const Math::Matrix4& GetViewMatrix() const { return mCamera->GetViewMatrix(); }
 
-    void AddMesh(const Mesh& mesh, const Model* model, float distance,
-        D3D12_GPU_VIRTUAL_ADDRESS meshCBV,
-        D3D12_GPU_VIRTUAL_ADDRESS materialCBV);
+    void AddMesh(const SubMesh& mesh, const Model* model, float distance, D3D12_GPU_VIRTUAL_ADDRESS meshCBV);
 
     void Sort();
 
@@ -98,8 +111,8 @@ private:
             {
                 uint64_t objectIdx : 16;
                 uint64_t psoIdx : 12;
-                uint64_t key : 32;
-                uint64_t passID : 4;
+                uint64_t distance : 32;
+                uint64_t passID : 4;    // high bit is priority
             };
         };
     };
@@ -107,22 +120,21 @@ private:
     struct SortObject
     {
         const Model* model;
-        const SubMesh* mesh;
-        D3D12_GPU_VIRTUAL_ADDRESS materialCBV;
         D3D12_GPU_VIRTUAL_ADDRESS meshCBV;
     };
 
-    std::vector<SortObject> m_SortObjects;
-    std::vector<uint64_t> m_SortKeys;
-    BatchType m_BatchType;
-    uint32_t m_PassCounts[kNumPasses];
-    DrawPass m_CurrentPass;
-    uint32_t m_CurrentDraw;
+    std::vector<SortObject> mSortObjects;
+    std::vector<SortKey> mSortKeys;
+    BatchType mBatchType;
+    uint32_t mPassCounts[kNumPasses];
+    DrawPass mCurrentPass;
+    uint32_t mCurrentDraw;
 
-    const Math::BaseCamera* m_Camera;
-    D3D12_VIEWPORT m_Viewport;
-    D3D12_RECT m_Scissor;
-    uint32_t m_NumRTVs;
-    ColorBuffer* m_RTV[8];
-    DepthBuffer* m_DSV;
+    const Scene* mScene;
+    const Math::BaseCamera* mCamera;
+    D3D12_VIEWPORT mViewport;
+    D3D12_RECT mScissor;
+    uint32_t mNumRTVs;
+    ColorBuffer* mRenderTarges[8];
+    DepthBuffer* mDepthBuffer;
 };

@@ -11,9 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "ShaderUtility.hlsli"
+#include "Utility.hlsli"
 #include "PresentRS.hlsli"
-#include "ToneMappingUtility.hlsli"
 
 #ifndef TONEMAPPING
 #define TONEMAPPING 1
@@ -35,7 +34,7 @@ float3 SampleColor(float2 uv)
 
 float3 ScaleBuffer(float2 uv)
 {
-    // 看起来像是锐化图像
+    // seems to sharpen image
     return 1.4 * SampleColor(uv) - 0.1 * (
         SampleColor(uv + float2(+UVOffset.x, +UVOffset.y)) +
         SampleColor(uv + float2(+UVOffset.x, -UVOffset.y)) +

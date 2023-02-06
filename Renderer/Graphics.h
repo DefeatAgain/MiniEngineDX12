@@ -4,6 +4,7 @@
 
 class DescriptorAllocator;
 class ColorBuffer;
+class DepthBuffer;
 
 namespace Graphics
 {
@@ -35,6 +36,10 @@ namespace Graphics
 
     ColorBuffer& GetSwapChainBuffer(size_t i);
     ColorBuffer& GetSceneColorBuffer(size_t i);
+    DepthBuffer& GetSceneDepthBuffer(size_t i);
+
+    D3D12_VIEWPORT GetDefaultViewPort();
+    D3D12_RECT GetDefaultScissor();
 
     bool IsDeviceNvidia(ID3D12Device* pDevice);
     bool IsDeviceAMD(ID3D12Device* pDevice);

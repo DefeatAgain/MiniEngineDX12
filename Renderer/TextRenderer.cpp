@@ -398,8 +398,6 @@ CommandList* TextContext::RenderTask(CommandList* commandList, BOOL enableHDR)
     graphicsCL.ExceptResourceBeginState(swapChain, D3D12_RESOURCE_STATE_RENDER_TARGET);
     graphicsCL.SetViewportAndScissor(0, 0, swapChain.GetWidth(), swapChain.GetHeight());
     graphicsCL.SetRenderTarget(swapChain.GetRTV());
-    //commandList.SetRootSignature(TextRenderer::sRootSignature);
-    //graphicsCL.SetPipelineState(TextRenderer::sShadowPSO[m_HDR]);
     graphicsCL.SetPipelineState(*TextRenderer::sTextPSO);
     graphicsCL.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 

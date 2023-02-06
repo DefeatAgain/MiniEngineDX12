@@ -206,7 +206,7 @@ void Texture::CreatePIXImageFromMemory(const void* memBuffer, size_t fileSize)
     Create2D(header.Pitch, header.Width, header.Height, header.Format, (uint8_t*)memBuffer + sizeof(Header));
 }
 
-bool Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags, bool mutiThreadsCalled)
+bool Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags)
 {
     if (filepath.extension() != L".dds")
     {
@@ -238,16 +238,18 @@ bool Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flag
         srvDesc.Texture2D.PlaneSlice = 0;
         srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
     }
-    
-    static std::mutex Mutex;
-    std::unique_lock<std::mutex> lockGuard(Mutex, std::defer_lock);
-    if (mutiThreadsCalled)
-        lockGuard.lock();
 
-    if (!mDescriptorHandle)
-        mDescriptorHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mDescriptorHandle);
-    PushGraphicsTaskAsync(&Texture::InitTextureTask1, this, subresources, std::move(ddsData));
+    {
+        static std::mutex sMutex;
+        std::lock_guard<std::mutex> lockGuard(sMutex);
+
+        if (!mDescriptorHandle)
+            mDescriptorHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mDescriptorHandle);
+
+        PushGraphicsTaskAsync(&Texture::InitTextureTask1, this, subresources, std::move(ddsData));
+    }
 
     return SUCCEEDED(hr);
 }
@@ -265,7 +267,7 @@ void Texture::Reset()
 
     GpuResource::Destroy();
 
-    mVersionId = -1;
+    *mVersionId = -1;
 }
 
 bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
@@ -457,14 +459,14 @@ DescriptorHandle TextureRef::GetSRV() const
 {
     if (IsValid())
         return mRef->GetSRV();
-    return Graphics::GetDefaultTexture(Graphics::kMagenta2D).GetSRV();
+    return Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D).GetSRV();
 }
 
 const Texture* TextureRef::Get() const
 {
     if (IsValid())
         return mRef;
-    return &Graphics::GetDefaultTexture(Graphics::kMagenta2D);
+    return &Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D);
 }
 
 
@@ -487,6 +489,6 @@ TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uin
     const auto& insertIter = mTextures.emplace(filename, filename.stem());
     Texture& newTexture = insertIter.first->second;
 
-    sPrepareList.emplace(Utility::gThreadPoolExecutor.Submit(&Texture::CreateFromDirectXTex, &newTexture, realPath, flags, true));
+    sPrepareList.emplace(Utility::gThreadPoolExecutor.Submit(&Texture::CreateFromDirectXTex, &newTexture, realPath, flags));
     return TextureRef(&newTexture);
 }

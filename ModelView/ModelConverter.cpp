@@ -124,7 +124,7 @@ namespace ModelConverter
                     texSampleDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
                 }
 
-                pbrMat.mSamplers[ti] = GET_SAM(texSampleDesc);
+                pbrMat.mSamplers[ti] = GET_SAM_HANDLE(texSampleDesc);
 
                 std::filesystem::path imagePath = asset.m_basePath / gltfMat.textures[ti]->source->path;
                 pbrMat.mTextures[ti] = GET_TEXF(imagePath, 
@@ -221,8 +221,8 @@ namespace ModelConverter
         const bool HasTangents = primitive.attributes[glTF::Primitive::kTangent] != nullptr;
         const bool HasUV0 = primitive.attributes[glTF::Primitive::kTexcoord0] != nullptr;
         const bool HasUV1 = primitive.attributes[glTF::Primitive::kTexcoord1] != nullptr;
-        const bool HasUV2 = primitive.attributes[glTF::Primitive::kTexcoord2] != nullptr;
-        const bool HasUV3 = primitive.attributes[glTF::Primitive::kTexcoord3] != nullptr;
+        //const bool HasUV2 = primitive.attributes[glTF::Primitive::kTexcoord2] != nullptr;
+        //const bool HasUV3 = primitive.attributes[glTF::Primitive::kTexcoord3] != nullptr;
 
         std::vector<D3D12_INPUT_ELEMENT_DESC> InputElements;
         InputElements.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, glTF::Primitive::kPosition });
@@ -246,18 +246,18 @@ namespace ModelConverter
                 AccessorFormat(*primitive.attributes[glTF::Primitive::kTexcoord1]),
                 glTF::Primitive::kTexcoord1 });
         }
-        if (HasUV2)
-        {
-            InputElements.push_back({ "TEXCOORD", 2,
-               AccessorFormat(*primitive.attributes[glTF::Primitive::kTexcoord2]),
-               glTF::Primitive::kTexcoord2 });
-        }
-        if (HasUV3)
-        {
-            InputElements.push_back({ "TEXCOORD", 3,
-               AccessorFormat(*primitive.attributes[glTF::Primitive::kTexcoord3]),
-               glTF::Primitive::kTexcoord3 });
-        }
+        //if (HasUV2)
+        //{
+        //    InputElements.push_back({ "TEXCOORD", 2,
+        //       AccessorFormat(*primitive.attributes[glTF::Primitive::kTexcoord2]),
+        //       glTF::Primitive::kTexcoord2 });
+        //}
+        //if (HasUV3)
+        //{
+        //    InputElements.push_back({ "TEXCOORD", 3,
+        //       AccessorFormat(*primitive.attributes[glTF::Primitive::kTexcoord3]),
+        //       glTF::Primitive::kTexcoord3 });
+        //}
 
         VBReader vbr;
         vbr.Initialize({ InputElements.data(), (uint32_t)InputElements.size() });
@@ -321,16 +321,16 @@ namespace ModelConverter
             texcoords[1].reset(new XMFLOAT2[vertexCount]);
             CheckHR(vbr.Read(texcoords[1].get(), "TEXCOORD", 1, vertexCount));
         }
-        if (HasUV2)
-        {
-            texcoords[2].reset(new XMFLOAT2[vertexCount]);
-            CheckHR(vbr.Read(texcoords[2].get(), "TEXCOORD", 2, vertexCount));
-        }
-        if (HasUV3)
-        {
-            texcoords[3].reset(new XMFLOAT2[vertexCount]);
-            CheckHR(vbr.Read(texcoords[3].get(), "TEXCOORD", 3, vertexCount));
-        }
+        //if (HasUV2)
+        //{
+        //    texcoords[2].reset(new XMFLOAT2[vertexCount]);
+        //    CheckHR(vbr.Read(texcoords[2].get(), "TEXCOORD", 2, vertexCount));
+        //}
+        //if (HasUV3)
+        //{
+        //    texcoords[3].reset(new XMFLOAT2[vertexCount]);
+        //    CheckHR(vbr.Read(texcoords[3].get(), "TEXCOORD", 3, vertexCount));
+        //}
 
         if (HasTangents)
         {
@@ -379,16 +379,16 @@ namespace ModelConverter
             OutputElements.push_back({ "TEXCOORD", 1, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
             subMesh.psoFlags |= ePSOFlags::kHasUV1;
         }
-        if (texcoords[2].get())
-        {
-            OutputElements.push_back({ "TEXCOORD", 2, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
-            subMesh.psoFlags |= ePSOFlags::kHasUV2;
-        }
-        if (texcoords[3].get())
-        {
-            OutputElements.push_back({ "TEXCOORD", 3, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
-            subMesh.psoFlags |= ePSOFlags::kHasUV3;
-        }
+        //if (texcoords[2].get())
+        //{
+        //    OutputElements.push_back({ "TEXCOORD", 2, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        //    subMesh.psoFlags |= ePSOFlags::kHasUV2;
+        //}
+        //if (texcoords[3].get())
+        //{
+        //    OutputElements.push_back({ "TEXCOORD", 3, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        //    subMesh.psoFlags |= ePSOFlags::kHasUV3;
+        //}
         if (primitive.material->alphaBlend)
             subMesh.psoFlags |= ePSOFlags::kAlphaBlend;
         if (primitive.material->alphaTest)
@@ -415,13 +415,13 @@ namespace ModelConverter
         if (tangent.get())
             CheckHR(vbw.Write(tangent.get(), "TANGENT", 0, vertexCount, true));
         if (texcoords[0].get())
-            CheckHR(vbw.Write(texcoords[0].get(), "TEXCOORD", 0, vertexCount));
+            CheckHR(vbw.Write(texcoords[0].get(), "TEXCOORD", 0, vertexCount, true));
         if (texcoords[1].get())
-            CheckHR(vbw.Write(texcoords[1].get(), "TEXCOORD", 1, vertexCount));
-        if (texcoords[2].get())
-            CheckHR(vbw.Write(texcoords[2].get(), "TEXCOORD", 2, vertexCount));
-        if (texcoords[3].get())
-            CheckHR(vbw.Write(texcoords[3].get(), "TEXCOORD", 3, vertexCount));
+            CheckHR(vbw.Write(texcoords[1].get(), "TEXCOORD", 1, vertexCount, true));
+        //if (texcoords[2].get())
+        //    CheckHR(vbw.Write(texcoords[2].get(), "TEXCOORD", 2, vertexCount));
+        //if (texcoords[3].get())
+        //    CheckHR(vbw.Write(texcoords[3].get(), "TEXCOORD", 3, vertexCount));
 
         // Now write a VB for positions only (or positions and UV when alpha testing)
         std::vector<D3D12_INPUT_ELEMENT_DESC> DepthElements;
@@ -466,7 +466,7 @@ namespace ModelConverter
         for (size_t i = 0; i < asset.m_meshes.size(); i++)
         {
             const glTF::Mesh& gltfMesh = asset.m_meshes[i];
-            Mesh& mesh = MeshManager::GetInstance()->AddMesh();
+            Mesh& mesh = MeshManager::GetInstance()->AddUnInitializedMesh();
             mesh.subMeshes = std::make_unique<SubMesh[]>(gltfMesh.primitives.size());
             mesh.subMeshCount = gltfMesh.primitives.size();
 
@@ -607,7 +607,7 @@ namespace ModelConverter
         
         sScenePtr = std::make_unique<Scene>();
         sScenePtr->mModels.resize(asset.m_nodes.size());
-        sScenePtr->mMeshConstants.resize(asset.m_nodes.size());
+        sScenePtr->mModelTransform.resize(asset.m_nodes.size());
 
         const glTF::Scene* gltfScene = asset.m_scene; // only one scene
         WalkGraph(sScenePtr->mModels, gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));

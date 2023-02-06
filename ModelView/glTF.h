@@ -106,7 +106,7 @@ namespace glTF
 
     struct Primitive
     {
-        enum eAttribType { kPosition, kNormal, kTangent, kTexcoord0, kTexcoord1, kTexcoord2, kTexcoord3, kColor0, kJoints0, kWeights0, kNumAttribs };
+        enum eAttribType { kPosition, kNormal, kTangent, kTexcoord0, kTexcoord1, kColor0, kJoints0, kWeights0, kNumAttribs };
         Accessor* attributes[kNumAttribs];
         Accessor* indices;
         Material* material;

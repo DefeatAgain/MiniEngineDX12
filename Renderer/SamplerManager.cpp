@@ -26,7 +26,7 @@ void SamplerDesc::DestroyDescriptor(DescriptorHandle& Handle)
     Graphics::DeAllocateDescriptor(Handle, 1);
 }
 
-DescriptorHandle SamplerManager::CreateDescriptor(SamplerDesc samDesc)
+DescriptorHandle SamplerManager::GetOrCreateDescriptor(SamplerDesc samDesc)
 {
     size_t hashValue = Utility::HashState(&samDesc);
     auto iter = sSamplerCache.find(hashValue);

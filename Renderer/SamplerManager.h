@@ -62,10 +62,10 @@ private:
 public:
     ~SamplerManager() { Clear(); }
 
-    DescriptorHandle CreateDescriptor(SamplerDesc samDesc);
+    DescriptorHandle GetOrCreateDescriptor(SamplerDesc samDesc);
 
     // all DescriptorHandle invalid
     void Clear();
 };
 
-#define GET_SAM(samDesc) SamplerManager::GetInstance()->CreateDescriptor(samDesc)
+#define GET_SAM_HANDLE(samDesc) SamplerManager::GetInstance()->GetOrCreateDescriptor(samDesc)

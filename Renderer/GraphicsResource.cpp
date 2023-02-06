@@ -71,15 +71,15 @@ namespace Graphics
         gCommonRS->InitStaticSampler(2, SamplerLinearBorderDesc);
         gCommonRS->Finalize();
 
-        ADD_SHADER("GenMipsLinear", "GenerateMipsLinearCS.hlsl", kCS);
-        ADD_SHADER("GenMipsLinearOddX", "GenerateMipsLinearCS.hlsl", kCS, { "NON_POWER_OF_TWO", "1" });
-        ADD_SHADER("GenMipsLinearOddY", "GenerateMipsLinearCS.hlsl", kCS, { "NON_POWER_OF_TWO", "2" });
-        ADD_SHADER("GenMipsLinearOddCS", "GenerateMipsLinearCS.hlsl", kCS, { "NON_POWER_OF_TWO", "3" });
+        ADD_SHADER("GenMipsLinear", "GenerateMipsCS.hlsl", kCS);
+        ADD_SHADER("GenMipsLinearOddX", "GenerateMipsCS.hlsl", kCS, { "NON_POWER_OF_TWO", "1" });
+        ADD_SHADER("GenMipsLinearOddY", "GenerateMipsCS.hlsl", kCS, { "NON_POWER_OF_TWO", "2" });
+        ADD_SHADER("GenMipsLinearOddCS", "GenerateMipsCS.hlsl", kCS, { "NON_POWER_OF_TWO", "3" });
 
-        ADD_SHADER("GenMipsSRGB", "GenerateMipsLinearCS.hlsl", kCS);
-        ADD_SHADER("GenMipsSRGBOddX", "GenerateMipsLinearCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "1" });
-        ADD_SHADER("GenMipsSRGBOddY", "GenerateMipsLinearCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "2" });
-        ADD_SHADER("GenMipsSRGBOddCS", "GenerateMipsLinearCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "3" });
+        ADD_SHADER("GenMipsSRGB", "GenerateMipsCS.hlsl", kCS);
+        ADD_SHADER("GenMipsSRGBOddX", "GenerateMipsCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "1" });
+        ADD_SHADER("GenMipsSRGBOddY", "GenerateMipsCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "2" });
+        ADD_SHADER("GenMipsSRGBOddCS", "GenerateMipsCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "3" });
 
         // custom
         for (auto& initTask : gCustomRootSigShaderTasks)

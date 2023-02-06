@@ -46,20 +46,24 @@ protected:
 };
 
 
-class AsyncContext : public NonCopyable
+class AsyncContext
 {
 public:
     using GraphicsTask = GraphicsContext::GraphicsTask;
 
-    bool isValid() const { return mContextFence != 0 && mContextFence == mVersionId; }
+    virtual bool isValid() const { return *mContextFence == 0 || *mContextFence == *mVersionId; }
 
     void ForceWaitContext()
     {
         WaitAsyncFence();
-        mVersionId = mContextFence;
+        *mVersionId = *mContextFence;
     }
 protected:
-    AsyncContext() :mContextFence(0), mVersionId(0) {}
+    AsyncContext()
+    {
+        mContextFence = std::make_shared<uint64_t>(0);
+        mVersionId = std::make_shared<uint64_t>(0);
+    }
     ~AsyncContext() {}
 
     template<typename F, typename ...Args>
@@ -72,7 +76,7 @@ protected:
     template<typename F, typename ...Args>
     void PushGraphicsTaskAsync(F&& f, Args&&... args)
     {
-        if (!isValid())
+        if (!AsyncContext::isValid())
             ForceWaitContext();
 
         CommitGraphicsTaskWithCallback(GraphicsContext::PushGraphicsTaskBind(std::forward<F>(f), std::forward<Args>(args)...),
@@ -85,8 +89,8 @@ protected:
     virtual void CommitGraphicsTaskWithCallback(const GraphicsTask& graphicsTask, const std::function<void(uint64_t)>& callback) { ASSERT(false, "Not Impl Err"); }
     virtual void RegisterFecneEvent(const std::function<void(uint64_t)>& callback) { ASSERT(false, "Not Impl Err"); }
 protected:
-    uint64_t mContextFence;
-    uint64_t mVersionId;
+    std::shared_ptr<uint64_t> mContextFence;
+    std::shared_ptr<uint64_t> mVersionId;
 };
 
 

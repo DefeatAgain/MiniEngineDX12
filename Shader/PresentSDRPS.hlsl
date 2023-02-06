@@ -11,9 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "ShaderUtility.hlsli"
+#include "Utility.hlsli"
 #include "PresentRS.hlsli"
-#include "ToneMappingUtility.hlsli"
 
 #ifndef TONEMAPPING
 #define TONEMAPPING 1

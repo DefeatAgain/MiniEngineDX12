@@ -9,6 +9,7 @@
 
 class Model;
 class CameraController;
+class GraphicsCommandList;
 
 class Scene : public MutiGraphicsContext
 {
@@ -18,9 +19,8 @@ public:
 
     void Startup();
 
-    void Cleanup();
-
-    void RenderScene(const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor);
+    GraphicsCommandList* RenderScene(GraphicsCommandList* context);
+    GraphicsCommandList* RenderSkyBox(GraphicsCommandList* context);
 
     virtual void Update(float deltaTime) override;
 
@@ -32,17 +32,23 @@ public:
 
     void UpdateGlobalDescriptors();
 
+    Math::BoundingSphere UpdateModelBoundingSphere();
+public:
 	Math::Camera mSceneCamera;
+	ShadowCamera mShadowCamera;
     std::unique_ptr<CameraController> m_CameraController;
+    float mSunDirectionTheta;
+    float mSunDirectionPhi;
+    Vector3 mSunLightIntensity;
+
 	std::vector<Model> mModels;
-	std::vector<MeshConstants> mMeshConstants;
-    GlobalConstants globalConstants;
-private:
-    UploadBuffer mMeshConstants;
+	std::vector<Math::UniformTransform> mModelTransform;
+    GlobalConstants mGlobalConstants;
+    UploadBuffer mMeshConstantsUploader;
+    Math::BoundingSphere mSceneBoundingSphere;
+
     TextureRef mRadianceCubeMap;
     TextureRef mIrradianceCubeMap;
     float mSpecularIBLRange;
     float mSpecularIBLBias;
-    uint32_t mSSAOFullScreenID;
-    uint32_t mShadowBufferID;
 };

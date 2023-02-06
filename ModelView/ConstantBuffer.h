@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-struct MeshConstants
+struct ModelConstants
 {
     Math::Matrix4 World;         // Object to world
     Math::Matrix3 WorldIT;       // Object normal to world normal

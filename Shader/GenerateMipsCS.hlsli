@@ -11,7 +11,10 @@
 // Author:  James Stanard 
 //
 
+// 这个实现在 https://www.3dgep.com/learning-directx-12-4/ 中有具体的讲解而且代码几乎一样
+
 #include "CommonRS.hlsli"
+#include "Utility.hlsli"
 
 #ifndef NON_POWER_OF_TWO
 #define NON_POWER_OF_TWO 0
@@ -50,15 +53,6 @@ void StoreColor( uint Index, float4 Color )
 float4 LoadColor( uint Index )
 {
     return float4( gs_R[Index], gs_G[Index], gs_B[Index], gs_A[Index]);
-}
-
-float3 ApplySRGBCurve(float3 x)
-{
-    // This is exactly the sRGB curve
-    //return x < 0.0031308 ? 12.92 * x : 1.055 * pow(abs(x), 1.0 / 2.4) - 0.055;
-     
-    // This is cheaper but nearly equivalent
-    return x < 0.0031308 ? 12.92 * x : 1.13005 * sqrt(abs(x - 0.00228)) - 0.13448 * x + 0.005719;
 }
 
 float4 PackColor(float4 Linear)
@@ -131,9 +125,9 @@ void main( uint GI : SV_GroupIndex, uint3 DTid : SV_DispatchThreadID )
     // (binary: 001001) checks that X and Y are even.
     if ((GI & 0x9) == 0)
     {
-        float4 Src2 = LoadColor(GI + 0x01);
-        float4 Src3 = LoadColor(GI + 0x08);
-        float4 Src4 = LoadColor(GI + 0x09);
+        float4 Src2 = LoadColor(GI + 1);
+        float4 Src3 = LoadColor(GI + 8);
+        float4 Src4 = LoadColor(GI + 9);
         Src1 = 0.25 * (Src1 + Src2 + Src3 + Src4);
 
         OutMip2[DTid.xy / 2] = PackColor(Src1);
@@ -148,9 +142,9 @@ void main( uint GI : SV_GroupIndex, uint3 DTid : SV_DispatchThreadID )
     // This bit mask (binary: 011011) checks that X and Y are multiples of four.
     if ((GI & 0x1B) == 0)
     {
-        float4 Src2 = LoadColor(GI + 0x02);
-        float4 Src3 = LoadColor(GI + 0x10);
-        float4 Src4 = LoadColor(GI + 0x12);
+        float4 Src2 = LoadColor(GI + 2);
+        float4 Src3 = LoadColor(GI + 16);
+        float4 Src4 = LoadColor(GI + 18);
         Src1 = 0.25 * (Src1 + Src2 + Src3 + Src4);
 
         OutMip3[DTid.xy / 4] = PackColor(Src1);
@@ -166,9 +160,9 @@ void main( uint GI : SV_GroupIndex, uint3 DTid : SV_DispatchThreadID )
     // thread fits that criteria.
     if (GI == 0)
     {
-        float4 Src2 = LoadColor(GI + 0x04);
-        float4 Src3 = LoadColor(GI + 0x20);
-        float4 Src4 = LoadColor(GI + 0x24);
+        float4 Src2 = LoadColor(GI + 4);
+        float4 Src3 = LoadColor(GI + 32);
+        float4 Src4 = LoadColor(GI + 34);
         Src1 = 0.25 * (Src1 + Src2 + Src3 + Src4);
 
         OutMip4[DTid.xy / 8] = PackColor(Src1);

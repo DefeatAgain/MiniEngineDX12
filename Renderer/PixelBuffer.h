@@ -166,7 +166,7 @@ public:
 
     void BeginRendering(GraphicsCommandList& commandList);
     void EndRendering(GraphicsCommandList& commandList);
-private:
+public:
     D3D12_VIEWPORT mViewport;
     D3D12_RECT mScissor;
 };

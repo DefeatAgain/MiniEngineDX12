@@ -156,3 +156,21 @@ namespace Math
     }
 
 } // namespace Math
+
+
+class ShadowCamera : public Math::BaseCamera
+{
+public:
+    ShadowCamera() {}
+
+    void UpdateMatrix(
+        Math::Vector3 LightDirection,		// Direction parallel to light, in direction of travel
+        Math::Vector3 ShadowCenter,		// Center location on far bounding plane of shadowed region
+        Math::Vector3 ShadowBounds		// Width, height, and depth in world space represented by the shadow buffer
+    );
+
+    const Math::Matrix4& GetShadowMatrix() const { return mShadowMatrix; }
+
+private:
+    Math::Matrix4 mShadowMatrix;
+};

@@ -55,44 +55,51 @@ struct Mesh
 class MeshManager : public Singleton<MeshManager>, public CopyContext
 {
     USE_SINGLETON;
+
+    enum eBufferType
+    {
+        kVertexBuffer,
+        kDepthVertexBuffer,
+        kIndexBuffer,
+        kNumBufferTypes
+    };
 private:
     MeshManager() :
         mNeedUpdate(false), 
         mVertexBufferOffset(0), 
         mIndexBufferOffset(0), 
         mDepthVertexBufferOffset(0),
-        mCurrentUsesGpuBuffer(0)
+        mCurrentResientSize(0)
     {}
 public:
     ~MeshManager() {}
 
-    Mesh& AddMesh();
+    Mesh& AddUnInitializedMesh();
 
     void UpdateMeshes();
 
-    D3D12_GPU_VIRTUAL_ADDRESS GetCurVirtualAddr() { return mGpuVB[mCurrentUsesGpuBuffer].GetGpuVirtualAddress(); }
+    D3D12_GPU_VIRTUAL_ADDRESS GetVBVirtualAddr() { return mGpuBuffer[kVertexBuffer].GetGpuVirtualAddress(); }
+    D3D12_GPU_VIRTUAL_ADDRESS GetDepthVBVirtualAddr() { return mGpuBuffer[kDepthVertexBuffer].GetGpuVirtualAddress(); }
+    D3D12_GPU_VIRTUAL_ADDRESS GetIBVirtualAddr() { return mGpuBuffer[kIndexBuffer].GetGpuVirtualAddress(); }
 
     const Mesh* GetMesh(size_t index) const { return &mAllMeshs[index]; }
 private:
     void ReserveBuffer(size_t vertexBufferSize, size_t depthVertexBufferSize, size_t indexBufferSize);
 
-    CommandList* UpdateMeshBufferTask(CommandList* commandList);
-    CommandList* ReserveMeshBufferTask(CommandList* commandList);
+    CommandList* UpdateMeshBufferTask(CommandList* commandList, UploadBuffer cpuBuffer[kNumBufferTypes]);
+    CommandList* ReserveMeshBufferTask(CommandList* commandList, GpuBuffer newBuffer[kNumBufferTypes]);
 private:
     bool mNeedUpdate;
-    uint8_t mCurrentUsesGpuBuffer;
     uint32_t mVertexBufferOffset;
     uint32_t mIndexBufferOffset;
     uint32_t mDepthVertexBufferOffset;
+    GpuBuffer mGpuBuffer[kNumBufferTypes];
 
-    GpuBuffer mGpuVB[2];
-    GpuBuffer mGpuDepthVB[2];
-    GpuBuffer mGpuIB[2];
-    UploadBuffer mCpuVB;
-    UploadBuffer mCpuDepthVB;
-    UploadBuffer mCpuIB;
-
+    size_t mCurrentResientSize;
     std::vector<Mesh> mAllMeshs;
 };
 
 #define GET_MESH(index) MeshManager::GetInstance()->GetMesh(index)
+#define GET_MESH_VB MeshManager::GetInstance()->GetVBVirtualAddr()
+#define GET_MESH_DepthVB MeshManager::GetInstance()->GetDepthVBVirtualAddr()
+#define GET_MESH_IB MeshManager::GetInstance()->GetIBVirtualAddr()

@@ -34,12 +34,13 @@ public:
     void CreateTGAFromMemory(const void* memBuffer, size_t fileSize);
     bool CreateDDSFromMemory(const void* memBuffer, size_t fileSize);
     void CreatePIXImageFromMemory(const void* memBuffer, size_t fileSize);
-    bool CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags, bool mutiThreadsCalled);
+    bool CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags);
 
     virtual void Destroy() override;
     void Reset();
 
     const DescriptorHandle& GetSRV() const { return mDescriptorHandle; }
+    virtual bool isValid() const { return AsyncContext::isValid() && mContextFence != 0; }
 
     uint32_t GetWidth() const { return mWidth; }
     uint32_t GetHeight() const { return mHeight; }

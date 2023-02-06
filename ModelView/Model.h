@@ -13,7 +13,8 @@ public:
     Model() {}
 	~Model() {}
 
-    void Render(MeshRenderer& sorter) const;
+    void Render(MeshRenderer& sorter, const Math::UniformTransform& transform,
+        D3D12_GPU_VIRTUAL_ADDRESS meshCBV) const;
 
     Math::Matrix4 mXform;
     //Math::XMFLOAT3 position;

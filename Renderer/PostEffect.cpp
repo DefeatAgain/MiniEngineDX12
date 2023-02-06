@@ -26,7 +26,7 @@ namespace PostEffectRender
             sPresentRS->InitStaticSampler(1, Graphics::SamplerPointClampDesc);
             sPresentRS->Finalize();
 
-            ADD_SHADER("ScreenQuadPresentVS", L"ScreenQuadPresentVS.hlsl", kVS);
+            ADD_SHADER("ScreenQuadCommonVS", L"ScreenQuadCommonVS.hlsl", kVS);
             ADD_SHADER("ScaleAndPresentSDRPS", L"ScaleAndCompositeSDRPS.hlsl", kPS);
             ADD_SHADER("PresentSDRPS", L"PresentSDRPS.hlsl", kPS);
         });

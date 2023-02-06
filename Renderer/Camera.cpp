@@ -93,3 +93,20 @@ void Camera::UpdateProjMatrix(void)
         Vector4(0.0f, 0.0f, Q2, 0.0f)
     ));
 }
+
+void ShadowCamera::UpdateMatrix(Math::Vector3 LightDirection, Math::Vector3 ShadowCenter, Math::Vector3 ShadowBounds)
+{
+    SetLookDirection(LightDirection, Vector3(kZUnitVector));
+
+    // Converts world units to texel units so we can quantize the camera position to whole texel units
+    Vector3 RcpDimensions = Recip(ShadowBounds);
+
+    SetPosition(ShadowCenter);
+
+    SetProjMatrix(Matrix4::MakeScale(Vector3(2.0f, 2.0f, 1.0f) * RcpDimensions));
+
+    Update();
+
+    // Transform from clip space to texture space
+    mShadowMatrix = Matrix4(AffineTransform(Matrix3::MakeScale(0.5f, -0.5f, 1.0f), Vector3(0.5f, 0.5f, 0.0f))) * m_ViewProjMatrix;
+}

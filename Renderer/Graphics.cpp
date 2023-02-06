@@ -20,6 +20,7 @@ namespace
 
     ColorBuffer gDisplayPlane[SWAP_CHAIN_BUFFER_COUNT];
     ColorBuffer gSceneColorBuffer[SWAP_CHAIN_BUFFER_COUNT];
+    DepthBuffer gSceneDepthBuffer[SWAP_CHAIN_BUFFER_COUNT];
 
     float sFrameTime = 0.0f;
     uint64_t sFrameIndex = 0;
@@ -144,6 +145,33 @@ namespace Graphics
     ColorBuffer& GetSceneColorBuffer(size_t i)
     {
         return gSceneColorBuffer[i];
+    }
+
+    DepthBuffer& GetSceneDepthBuffer(size_t i)
+    {
+        return gSceneDepthBuffer[i];
+    }
+
+    D3D12_VIEWPORT GetDefaultViewPort()
+    {
+        D3D12_VIEWPORT viewport;
+        viewport.TopLeftX = 0.0;
+        viewport.TopLeftY = 0.0;
+        viewport.Width = (float)gSceneColorBuffer[0].GetWidth();
+        viewport.Height = (float)gSceneColorBuffer[0].GetHeight();
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+        return viewport;
+    }
+
+    D3D12_RECT GetDefaultScissor()
+    {
+        D3D12_RECT scissor;
+        scissor.left = 0;
+        scissor.top = 0;
+        scissor.right = (LONG)gSceneColorBuffer[0].GetWidth();
+        scissor.bottom = (LONG)gSceneColorBuffer[0].GetHeight();
+        return scissor;
     }
 
     bool IsDeviceNvidia(ID3D12Device* pDevice)
@@ -285,6 +313,7 @@ namespace Graphics
             gDisplayPlane[i].CreateFromSwapChain(L"Primary SwapChain Buffer", displayPlane);
 
             gSceneColorBuffer[i].Create(L"Scene Color Buffer", gRenderWidth, gRenderHeight, 1, HDR_FORMAT);
+            gSceneDepthBuffer[i].Create(L"Scene Depth Buffer", gRenderWidth, gRenderHeight, 1, DSV_FORMAT);
         }
     }
 
@@ -300,7 +329,10 @@ namespace Graphics
         for (uint32_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
         {
             gSceneColorBuffer[i].Destroy();
+            gSceneDepthBuffer[i].Destroy();
+
             gSceneColorBuffer[i].Create(L"Scene Color Buffer", width, height, 1, HDR_FORMAT);
+            gSceneDepthBuffer[i].Create(L"Scene Depth Buffer", gRenderWidth, gRenderHeight, 1, DSV_FORMAT);
         }
            
         FrameContextManager::GetInstance()->OnResizeSceneBuffer(width, height);

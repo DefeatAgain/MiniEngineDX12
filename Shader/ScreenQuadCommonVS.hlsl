@@ -18,9 +18,7 @@
 // Use null input layout
 // Draw(3)
 
-#include "CommonRS.hlsli"
 
-[RootSignature(Common_RootSig)]
 void main(
     in uint VertID : SV_VertexID,
     out float4 Pos : SV_Position,

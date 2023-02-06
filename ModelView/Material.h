@@ -26,8 +26,8 @@ enum ePSOFlags : uint16_t
     kAlphaTest = 0x040,
     kTwoSided = 0x080,
     kHasUV1 = 0x100,
-    kHasUV2 = 0x200,
-    kHasUV3 = 0x400,
+    //kHasUV2 = 0x200,
+    //kHasUV3 = 0x400,
 
     //kHasSkin = 0x200,     // Implies having indices and weights
 };
@@ -131,6 +131,7 @@ private:
 };
 
 #define UPDATE_MATERIAL(index) MaterialManager::GetInstance()->DirtyMaterial(index)
+#define GET_MATERIAL(index) MaterialManager::GetInstance()->GetMaterial(index)
 #define GET_MAT_VPTR(index) MaterialManager::GetInstance()->GetGpuBufferView(index)
 
 
@@ -147,6 +148,7 @@ public:
     uint16_t GetMaterialIdx() const { return mMaterialIdx; }
 
     //uint16_t GetPSOIdx() const { return mPSOIndex; }
+    eMaterialType GetType() const { return (eMaterialType)mType; }
 protected:
     Material(eMaterialType type) : mIsShared(0), mType(type), mMaterialIdx(0)/*, mPSOIndex(0)*/ {}
 private:
@@ -154,9 +156,9 @@ private:
 protected:
     uint16_t mType : 8;
     uint16_t mNumDirtyCount : 7;
-    uint16_t mBufferOffset;          // Offset of GpuBuffer, mutipile of 256 
-    //uint16_t mPSOIndex;              // Index of pipeline state object
     uint16_t mMaterialIdx;           // Index of material
+    uint32_t mBufferOffset;          // Offset of GpuBuffer, mutipile of 256 
+    //uint16_t mPSOIndex;              // Index of pipeline state object
 };
 
 
