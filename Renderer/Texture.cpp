@@ -54,7 +54,7 @@ void Texture::Create2D(size_t rowPitchBytes, size_t width, size_t height, DXGI_F
     texResource.SlicePitch = rowPitchBytes * height;
 
     if (!mDescriptorHandle)
-        mDescriptorHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     Graphics::gDevice->CreateShaderResourceView(mResource.Get(), nullptr, mDescriptorHandle);
 
     PushGraphicsTaskSync(&Texture::InitTextureTask, this, 1, &texResource);
@@ -109,7 +109,7 @@ void Texture::CreateCube(size_t rowPitchBytes, size_t width, size_t height, DXGI
     //    PushGraphicsTaskAsync(&Texture::InitTextureTask1, this, 1, &texResource, std::shared_ptr<const void>(initialData));
 
     if (!mDescriptorHandle)
-        mDescriptorHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = format;
@@ -178,7 +178,7 @@ void Texture::CreateCube(size_t rowPitchBytes, size_t width, size_t height, DXGI
 //bool Texture::CreateDDSFromMemory(const void* memBuffer, size_t fileSize)
 //{
 //    if (!mDescriptorHandle)
-//        mDescriptorHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+//        mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 //
 //    std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 //    HRESULT hr = DirectX::LoadDDSTextureFromMemory(
@@ -244,7 +244,7 @@ bool Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flag
         std::lock_guard<std::mutex> lockGuard(sMutex);
 
         if (!mDescriptorHandle)
-            mDescriptorHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
         Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mDescriptorHandle);
 
@@ -258,7 +258,7 @@ void Texture::Destroy()
 {
     Reset();
 
-    Graphics::DeAllocateDescriptor(mDescriptorHandle, 1);
+    DEALLOC_DESCRIPTOR(mDescriptorHandle, 1);
 }
 
 void Texture::Reset()

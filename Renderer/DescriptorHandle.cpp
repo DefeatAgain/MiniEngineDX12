@@ -211,3 +211,22 @@ void DescriptorAllocator::TreeShiftResetBit(std::vector<uint32_t>& bitMap, int s
 
     //return isCompleteReset;
 }
+
+
+// DescriptorHandle
+ID3D12DescriptorHeap* DescriptorHandle::GetDescriptorHeap() const
+{
+    return GET_DESCRIPTOR_ALLOC(GetType()).GetHeap(mOwningHeapIndex);
+}
+
+size_t DescriptorHandle::GetCpuPtr() const
+{
+    DescriptorAllocator& alloc = GET_DESCRIPTOR_ALLOC(GetType());
+    return alloc.GetHeapCpuStart(mOwningHeapIndex).ptr + (mOffset * alloc.mDescriptorSize);
+}
+
+uint64_t DescriptorHandle::GetGpuPtr() const
+{
+    DescriptorAllocator& alloc = GET_DESCRIPTOR_ALLOC(GetType());
+    return alloc.GetHeapGpuStart(mOwningHeapIndex).ptr + (mOffset * alloc.mDescriptorSize);
+}

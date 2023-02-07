@@ -220,7 +220,7 @@ void FrameContextManager::InitFrameContexts()
 	}
 }
 
-uint64_t FrameContextManager::CommitAsyncCopyTask(const GraphicsContext::GraphicsTask& copyTask)
+uint64_t FrameContextManager::CommitAsyncCopyTask(const Graphics::GraphicsContext::GraphicsTask& copyTask)
 {
 	using namespace Graphics;
 	CommandQueue& queue = CommandQueueManager::GetInstance()->GetCopyQueue();
@@ -231,7 +231,7 @@ uint64_t FrameContextManager::CommitAsyncCopyTask(const GraphicsContext::Graphic
 	return queue.ExecuteCommandLists((ID3D12CommandList**)commandList->GetDeviceCommandListOf(), 1);
 }
 
-uint64_t FrameContextManager::CommitAsyncComputeTask(const GraphicsContext::GraphicsTask& computeTask)
+uint64_t FrameContextManager::CommitAsyncComputeTask(const Graphics::GraphicsContext::GraphicsTask& computeTask)
 {
 	using namespace Graphics;
 	CommandQueue& queue = CommandQueueManager::GetInstance()->GetComputeQueue();
@@ -242,7 +242,7 @@ uint64_t FrameContextManager::CommitAsyncComputeTask(const GraphicsContext::Grap
 	return queue.ExecuteCommandLists((ID3D12CommandList**)commandList->GetDeviceCommandListOf(), 1);
 }
 
-uint64_t FrameContextManager::CommitAsyncGraphicsTask(const GraphicsContext::GraphicsTask& graphicsTask)
+uint64_t FrameContextManager::CommitAsyncGraphicsTask(const Graphics::GraphicsContext::GraphicsTask& graphicsTask)
 {
 	using namespace Graphics;
 	CommandQueue& queue = CommandQueueManager::GetInstance()->GetGraphicsQueue();

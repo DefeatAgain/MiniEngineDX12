@@ -1,4 +1,6 @@
 #pragma once
+#include <filesystem>
+#include <string>
 
 namespace glTF
 {
@@ -12,9 +14,11 @@ class Scene;
 */
 namespace ModelConverter
 {
+	std::filesystem::path GetIBLTexture(const std::wstring& name);
+
 	void BuildMaterials(const glTF::Asset& asset);
 
 	void BuildAllMeshes(const glTF::Asset& asset);
 
-	Scene* BuildScene(const glTF::Asset& asset);
+	void BuildScene(Scene* scene, const glTF::Asset& asset);
 };

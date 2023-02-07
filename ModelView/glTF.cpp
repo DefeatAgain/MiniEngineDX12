@@ -232,8 +232,6 @@ void glTF::Asset::ProcessMeshes( json& meshes, json& accessors )
             FindAttribute(prim, attributes, Primitive::kTangent, "TANGENT");
             FindAttribute(prim, attributes, Primitive::kTexcoord0, "TEXCOORD_0");
             FindAttribute(prim, attributes, Primitive::kTexcoord1, "TEXCOORD_1");
-            FindAttribute(prim, attributes, Primitive::kTexcoord2, "TEXCOORD_2");
-            FindAttribute(prim, attributes, Primitive::kTexcoord3, "TEXCOORD_3");
             FindAttribute(prim, attributes, Primitive::kColor0, "COLOR_0");
             FindAttribute(prim, attributes, Primitive::kJoints0, "JOINTS_0");
             FindAttribute(prim, attributes, Primitive::kWeights0, "WEIGHTS_0");
@@ -723,6 +721,7 @@ void glTF::Asset::Parse(const std::filesystem::path& filepath)
     // Strip off file name to get root path to other related files
     m_basePath = filepath.parent_path();
 
+#undef GetObject // windows confit
     // Parse all state
     json& root = document.GetObject();
     if (root.HasMember("buffers"))

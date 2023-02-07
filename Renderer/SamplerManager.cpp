@@ -10,7 +10,7 @@ namespace
 
 DescriptorHandle SamplerDesc::CreateDescriptor()
 {
-    DescriptorHandle Handle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    DescriptorHandle Handle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     Graphics::gDevice->CreateSampler(this, Handle);
     return Handle;
 }
@@ -23,7 +23,7 @@ void SamplerDesc::CreateDescriptor(const DescriptorHandle& Handle)
 
 void SamplerDesc::DestroyDescriptor(DescriptorHandle& Handle)
 {
-    Graphics::DeAllocateDescriptor(Handle, 1);
+    DEALLOC_DESCRIPTOR(Handle, 1);
 }
 
 DescriptorHandle SamplerManager::GetOrCreateDescriptor(SamplerDesc samDesc)
@@ -35,7 +35,7 @@ DescriptorHandle SamplerManager::GetOrCreateDescriptor(SamplerDesc samDesc)
         return iter->second;
     }
 
-    DescriptorHandle Handle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    DescriptorHandle Handle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     Graphics::gDevice->CreateSampler(&samDesc, Handle);
     return sSamplerCache.emplace(hashValue, Handle).first->second;
 }
@@ -44,6 +44,6 @@ void SamplerManager::Clear()
 {
     for (auto& kv : sSamplerCache)
     {
-        Graphics::DeAllocateDescriptor(kv.second, 1);
+        DEALLOC_DESCRIPTOR(kv.second, 1);
     }
 }

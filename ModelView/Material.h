@@ -10,7 +10,7 @@ enum eMaterialType : uint8_t
     kNumMaterialTypes
 };
 
-const char* MaterialTypeStr[kNumMaterialTypes] =
+inline const char* MaterialTypeStr[kNumMaterialTypes] =
 {
     "PBRMaterial"
 };
@@ -32,8 +32,58 @@ enum ePSOFlags : uint16_t
     //kHasSkin = 0x200,     // Implies having indices and weights
 };
 
-class Material;
 class GraphicsPipelineState;
+
+class Material
+{
+    friend class MaterialManager;
+public:
+    ~Material() {}
+
+    virtual const void* GetMaterialConstant() const = 0;
+
+    virtual size_t GetMaterialConstantSize() const = 0;
+
+    uint16_t GetMaterialIdx() const { return mMaterialIdx; }
+
+    //uint16_t GetPSOIdx() const { return mPSOIndex; }
+    eMaterialType GetType() const { return (eMaterialType)mType; }
+protected:
+    Material(eMaterialType type) : mIsShared(0), mType(type), mMaterialIdx(0)/*, mPSOIndex(0)*/ {}
+private:
+    uint16_t mIsShared : 1;
+protected:
+    uint16_t mType : 8;
+    uint16_t mNumDirtyCount : 7;
+    uint16_t mMaterialIdx;           // Index of material
+    uint32_t mBufferOffset;          // Offset of GpuBuffer, mutipile of 256 
+    //uint16_t mPSOIndex;              // Index of pipeline state object
+};
+
+
+class PBRMaterial : public Material
+{
+public:
+    enum eTextureType
+    { 
+        kBaseColor, 
+        kMetallicRoughness, 
+        kOcclusion, 
+        kEmissive,
+        kNormal, 
+        kNumTextures 
+    };
+public:
+    PBRMaterial() : Material(kPBRMaterial) {}
+    ~PBRMaterial() {}
+
+    virtual const void* GetMaterialConstant() const override { return reinterpret_cast<const void*>(&mMaterialConstant); }
+    virtual size_t GetMaterialConstantSize() const override { return sizeof(mMaterialConstant); }
+public:
+    PBRMaterialConstants mMaterialConstant;
+    TextureRef mTextures[kNumTextures];
+    DescriptorHandle mSamplers[kNumTextures];
+};
 
 
 class MaterialManager : public Singleton<MaterialManager>
@@ -46,8 +96,8 @@ private:
 public:
     ~MaterialManager() {}
 
-    void Reserve(size_t size) 
-    { 
+    void Reserve(size_t size)
+    {
         if (size <= mAllMaterials.size())
             return;
 
@@ -72,7 +122,8 @@ public:
         if (mAllMaterials.capacity() == 0)
             Reserve(mAllMaterials.size() * 2);
 
-        MaterialType& material = *mAllMaterials.emplace_back(std::make_unique<MaterialType>());
+
+        MaterialType& material = *dynamic_cast<MaterialType*>(mAllMaterials.emplace_back(std::make_unique<MaterialType>()).get());
         material.mIsShared = isShared;
         material.mMaterialIdx = mAllMaterials.size() - 1;
         material.mBufferOffset = mConstantBufferSize;
@@ -127,62 +178,8 @@ private:
     std::list<uint16_t> mDirtyMaterialIndices;
     uint16_t mConstantBufferSize;                                  // divided by 256
     size_t mNumDirtyCount;
-    std::vector<GraphicsPipelineState*> mPSOs;
 };
 
 #define UPDATE_MATERIAL(index) MaterialManager::GetInstance()->DirtyMaterial(index)
 #define GET_MATERIAL(index) MaterialManager::GetInstance()->GetMaterial(index)
 #define GET_MAT_VPTR(index) MaterialManager::GetInstance()->GetGpuBufferView(index)
-
-
-class Material
-{
-    friend class MaterialManager;
-public:
-    ~Material() {}
-
-    virtual const void* GetMaterialConstant() const = 0;
-
-    virtual size_t GetMaterialConstantSize() const = 0;
-
-    uint16_t GetMaterialIdx() const { return mMaterialIdx; }
-
-    //uint16_t GetPSOIdx() const { return mPSOIndex; }
-    eMaterialType GetType() const { return (eMaterialType)mType; }
-protected:
-    Material(eMaterialType type) : mIsShared(0), mType(type), mMaterialIdx(0)/*, mPSOIndex(0)*/ {}
-private:
-    uint16_t mIsShared : 1;
-protected:
-    uint16_t mType : 8;
-    uint16_t mNumDirtyCount : 7;
-    uint16_t mMaterialIdx;           // Index of material
-    uint32_t mBufferOffset;          // Offset of GpuBuffer, mutipile of 256 
-    //uint16_t mPSOIndex;              // Index of pipeline state object
-};
-
-
-class PBRMaterial : public Material
-{
-public:
-    enum eTextureType
-    { 
-        kBaseColor, 
-        kMetallicRoughness, 
-        kOcclusion, 
-        kEmissive,
-        kNormal, 
-        kNumTextures 
-    };
-public:
-    PBRMaterial() : Material(kPBRMaterial) {}
-    ~PBRMaterial() {}
-protected:
-    virtual const void* GetMaterialConstant() const override { return reinterpret_cast<const void*>(&mMaterialConstant); }
-
-    virtual size_t GetMaterialConstantSize() const override { return sizeof(mMaterialConstant); }
-public:
-    PBRMaterialConstants mMaterialConstant;
-    TextureRef mTextures[kNumTextures];
-    DescriptorHandle mSamplers[kNumTextures];
-};

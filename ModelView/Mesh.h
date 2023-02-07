@@ -51,8 +51,7 @@ struct Mesh
     uint32_t subMeshCount;
 };
 
-
-class MeshManager : public Singleton<MeshManager>, public CopyContext
+class MeshManager : public Singleton<MeshManager>, public Graphics::CopyContext
 {
     USE_SINGLETON;
 
@@ -84,7 +83,7 @@ public:
 
     const Mesh* GetMesh(size_t index) const { return &mAllMeshs[index]; }
 private:
-    void ReserveBuffer(size_t vertexBufferSize, size_t depthVertexBufferSize, size_t indexBufferSize);
+    void ReserveBuffer(uint32_t vertexBufferSize, uint32_t depthVertexBufferSize, uint32_t indexBufferSize);
 
     CommandList* UpdateMeshBufferTask(CommandList* commandList, UploadBuffer cpuBuffer[kNumBufferTypes]);
     CommandList* ReserveMeshBufferTask(CommandList* commandList, GpuBuffer newBuffer[kNumBufferTypes]);

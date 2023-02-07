@@ -14,8 +14,6 @@ namespace GameApp
 
 		virtual void Cleanup() = 0;
 
-		virtual void Render() = 0;
-
 		virtual bool RequiresRaytracingSupport() { return false; }
 
 		virtual bool IsDone();

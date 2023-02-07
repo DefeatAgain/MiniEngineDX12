@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "Math/VectorMath.h"
 
 struct ModelConstants
 {

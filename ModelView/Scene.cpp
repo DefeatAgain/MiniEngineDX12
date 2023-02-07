@@ -9,18 +9,21 @@
 void Scene::Startup()
 {
     mSceneCamera.SetZRange(1.0f, 10000.0f);
+    mDirtyModels = true;
 
-    UpdateModelBoundingSphere();
+    UpdateModels();
 
-    m_CameraController.reset(new OrbitCamera(mSceneCamera, mSceneBoundingSphere, Vector3(kYUnitVector)));
+    mCameraController.reset(new OrbitCamera(mSceneCamera, mSceneBoundingSphere, Vector3(kYUnitVector)));
 
     mSunDirectionTheta = 0.75f;
     mSunDirectionPhi = -0.5f;
     mSunLightIntensity = Vector3(1, 1, 1);
 }
 
-GraphicsCommandList* Scene::RenderScene(GraphicsCommandList* context)
+CommandList* Scene::RenderScene(CommandList* context)
 {
+    GraphicsCommandList& ghContext = context->GetGraphicsCommandList().Begin();
+
     float costheta = cosf(mSunDirectionTheta);
     float sintheta = sinf(mSunDirectionTheta);
     float cosphi = cosf(mSunDirectionPhi * 3.14159f * 0.5f);
@@ -39,8 +42,8 @@ GraphicsCommandList* Scene::RenderScene(GraphicsCommandList* context)
     // Begin rendering depth
     DepthBuffer& depthBuffer = CURRENT_SCENE_DEPTH_BUFFER;
     ColorBuffer& colorBuffer = CURRENT_SCENE_COLOR_BUFFER;
-    context->TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-    context->ClearDepth(depthBuffer);
+    ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    ghContext.ClearDepth(depthBuffer);
 
     MeshRenderer meshRenderer(MeshRenderer::kDefault);
     meshRenderer.SetCamera(mSceneCamera);
@@ -56,7 +59,7 @@ GraphicsCommandList* Scene::RenderScene(GraphicsCommandList* context)
     }
 
     meshRenderer.Sort();
-    meshRenderer.RenderMeshes(*context, globals, MeshRenderer::kZPass);
+    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
 
     MeshRenderer shadowRenderer(MeshRenderer::kShadows);
     ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
@@ -70,23 +73,25 @@ GraphicsCommandList* Scene::RenderScene(GraphicsCommandList* context)
     }
 
     shadowRenderer.Sort();
-    shadowRenderer.RenderMeshes(*context, globals, MeshRenderer::kZPass);
+    shadowRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
 
-    context->TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    context->ClearColor(colorBuffer);
+    ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    ghContext.ClearColor(colorBuffer);
 
     //context->TransitionResource(g_SSAOFullScreen, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    context->TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-    context->SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
-    context->SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
-    meshRenderer.RenderMeshes(*context, globals, MeshRenderer::kOpaque);
+    ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    ghContext.SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
+    ghContext.SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
+    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kOpaque);
 
-    RenderSkyBox(context);
+    RenderSkyBox(ghContext);
 
-    meshRenderer.RenderMeshes(*context, globals, MeshRenderer::kTransparent);
+    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kTransparent);
+
+    return context;
 }
 
-GraphicsCommandList* Scene::RenderSkyBox(GraphicsCommandList* context)
+void Scene::RenderSkyBox(GraphicsCommandList& ghContext)
 {
     __declspec(align(16)) struct SkyboxVSCB
     {
@@ -105,43 +110,64 @@ GraphicsCommandList* Scene::RenderSkyBox(GraphicsCommandList* context)
     DepthBuffer& depthBuffer = CURRENT_SCENE_DEPTH_BUFFER;
     ColorBuffer& colorBuffer = CURRENT_SCENE_COLOR_BUFFER;
     //context->SetRootSignature(m_RootSig);
-    context->SetPipelineState(*ModelRenderer::sSkyboxPSO);
+    ghContext.SetPipelineState(*ModelRenderer::sSkyboxPSO);
 
-    context->TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-    context->TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    context->SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
-    context->SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
+    ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    ghContext.SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
+    ghContext.SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
 
     //context->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_TextureHeap.GetHeapPointer());
-    context->SetDynamicConstantBufferView(ModelRenderer::kMeshConstants, sizeof(SkyboxVSCB), &skyVSCB);
-    context->SetDynamicConstantBufferView(ModelRenderer::kMaterialConstants, sizeof(SkyboxPSCB), &skyPSCB);
-    context->SetDescriptorTable(ModelRenderer::kRadianceIBLTexture, mRadianceCubeMap.GetSRV());
-    context->Draw(3);
-
-    return context;
+    ghContext.SetDynamicConstantBufferView(ModelRenderer::kMeshConstants, sizeof(SkyboxVSCB), &skyVSCB);
+    ghContext.SetDynamicConstantBufferView(ModelRenderer::kMaterialConstants, sizeof(SkyboxPSCB), &skyPSCB);
+    ghContext.SetDescriptorTable(ModelRenderer::kRadianceIBLTexture, mRadianceCubeMap.GetSRV());
+    ghContext.Draw(3);
 }
 
 void Scene::Update(float deltaTime)
 {
+    UpdateModels();
+
+    mCameraController->Update(deltaTime);
 }
 
 void Scene::Render()
 {
+    PUSH_MUTIRENDER_TASK({ D3D12_COMMAND_LIST_TYPE_DIRECT, PushGraphicsTaskBind(&Scene::RenderScene, this) });
 }
 
-void Scene::SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL)
+void Scene::UpdateModels()
 {
+    if (!mDirtyModels)
+        return;
+
+    ASSERT(mModelTransform.size() == mModels.size());
+
+    for (size_t i = 0; i < mModels.size(); i++)
+    {
+        Model& model = mModels[i];
+
+        const Math::AffineTransform transformAffine(model.mLocalTrans);
+        if (model.mParentIndex != (uint32_t)-1)
+        {
+            mModelTransform[i] = transformAffine * mModelTransform[model.mParentIndex];
+        }
+        else
+        {
+            mModelTransform[i] = transformAffine;
+        }
+
+        Math::BoundingSphere boundingSphere(mModelTransform[i].GetTranslation(), mModelTransform[i].GetUniformScale());
+        model.m_BSOS = boundingSphere;
+        model.m_BBoxOS = Math::AxisAlignedBox::CreateFromSphere(boundingSphere);
+    }
+
+    UpdateModelBoundingSphere();
+
+    mDirtyModels = false;
 }
 
-void Scene::SetIBLBias(float LODBias)
-{
-}
-
-void Scene::UpdateGlobalDescriptors()
-{
-}
-
-BoundingSphere Scene::UpdateModelBoundingSphere()
+void Scene::UpdateModelBoundingSphere()
 {
     BoundingSphere boundingSphere;
     for (size_t i = 0; i < mModels.size(); i++)

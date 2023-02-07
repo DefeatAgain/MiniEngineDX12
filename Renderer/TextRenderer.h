@@ -23,7 +23,7 @@ namespace TextRenderer
     class Font;
 }
 
-class TextContext : public MutiGraphicsContext
+class TextContext : public Graphics::MutiGraphicsContext
 {
 public:
     TextContext(float CanvasWidth = 1920.0f, float CanvasHeight = 1080.0f);

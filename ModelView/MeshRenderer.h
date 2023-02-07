@@ -5,8 +5,9 @@
 #include "Material.h"
 #include "Utils/DebugUtils.h"
 
-class Mesh;
-class SubMesh;
+struct Mesh;
+struct SubMesh;
+
 class Model;
 class Scene;
 class ColorBuffer;
@@ -52,6 +53,7 @@ namespace ModelRenderer
     inline GraphicsPipelineState* sSkyboxPSO;
 
     void Initialize();
+    void Destroy();
 
     uint16_t GetPsoIndex(ePSOFlags psoFlags);
     uint16_t GetDepthPsoIndex(ePSOFlags psoFlags, bool isShadow);
@@ -115,6 +117,8 @@ private:
                 uint64_t passID : 4;    // high bit is priority
             };
         };
+
+        operator uint64_t() { return value; }
     };
 
     struct SortObject

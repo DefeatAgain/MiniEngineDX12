@@ -306,8 +306,7 @@ void MeshRenderer::AddMesh(const SubMesh& subMesh, const Model* model, float dis
 
 void MeshRenderer::Sort()
 {
-    struct { bool operator()(uint64_t a, uint64_t b) const { return a < b; } } Cmp;
-    std::sort(mSortKeys.begin(), mSortKeys.end(), Cmp);
+    std::sort(mSortKeys.begin(), mSortKeys.end(), [](uint64_t a, uint64_t b) {return a < b; });
 }
 
 void MeshRenderer::RenderMeshes(GraphicsCommandList& context, GlobalConstants& globals, DrawPass pass)
@@ -317,8 +316,8 @@ void MeshRenderer::RenderMeshes(GraphicsCommandList& context, GlobalConstants& g
     // Set common shader constants
     globals.ViewProjMatrix = mCamera->GetViewProjMatrix();
     globals.CameraPos = mCamera->GetPosition();
-    globals.IBLRange = mScene->mSpecularIBLRange - mScene->mSpecularIBLBias;
-    globals.IBLBias = mScene->mSpecularIBLBias;
+    globals.IBLRange = mScene->GetIBLRange() - mScene->GetIBLBias();
+    globals.IBLBias = mScene->GetIBLBias();
     context.SetDynamicConstantBufferView(ModelRenderer::kGlobalConstants, sizeof(GlobalConstants), &globals);
 
     if (mBatchType == kShadows)

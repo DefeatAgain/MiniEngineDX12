@@ -8,9 +8,9 @@ void GpuBuffer::Destroy()
 	mBufferSize = mElementSize = mElementCount = 0;
 
 	if (mUAV)
-		Graphics::DeAllocateDescriptor(mUAV, 1);
+		DEALLOC_DESCRIPTOR(mUAV, 1);
 	if (mSRV)
-		Graphics::DeAllocateDescriptor(mSRV, 1);
+		DEALLOC_DESCRIPTOR(mSRV, 1);
 }
 
 void GpuBuffer::Create(const std::wstring& name, uint32_t numElements, uint32_t elementSize, const void* initialData)
@@ -97,7 +97,7 @@ DescriptorHandle GpuBuffer::CreateConstantBufferView(uint32_t offset, uint32_t s
 	cbvDesc.BufferLocation = mGpuVirtualAddress + (size_t)offset;
 	cbvDesc.SizeInBytes = size;
 
-	DescriptorHandle hCBV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	DescriptorHandle hCBV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	Graphics::gDevice->CreateConstantBufferView(&cbvDesc, hCBV);
 	return hCBV;
 }
@@ -163,7 +163,7 @@ void ByteAddressBuffer::CreateDerivedViews()
 	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 
 	if (!mSRV)
-		mSRV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mSRV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mSRV);
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -173,7 +173,7 @@ void ByteAddressBuffer::CreateDerivedViews()
 	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
 
 	if (!mUAV)
-		mUAV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mUAV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	Graphics::gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &uavDesc, mUAV);
 }
 
@@ -190,7 +190,7 @@ void StructuredBuffer::CreateDerivedViews()
 	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 	if (!mSRV)
-		mSRV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mSRV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mSRV);
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -204,7 +204,7 @@ void StructuredBuffer::CreateDerivedViews()
 	mCounterBuffer.Create(L"StructuredBuffer::Counter", 1, 4);
 
 	if (!mUAV)
-		mUAV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mUAV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	Graphics::gDevice->CreateUnorderedAccessView(mResource.Get(), mCounterBuffer.GetResource(), &uavDesc, mUAV);
 }
 
@@ -232,7 +232,7 @@ void TypedBuffer::CreateDerivedViews()
 	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 	if (!mSRV)
-		mSRV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mSRV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mSRV);
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -242,7 +242,7 @@ void TypedBuffer::CreateDerivedViews()
 	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 	if (!mUAV)
-		mUAV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mUAV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	Graphics::gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &uavDesc, mUAV);
 }
 

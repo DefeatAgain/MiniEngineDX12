@@ -196,6 +196,7 @@ namespace Math
         INLINE Vector3 GetZ() const { return m_basis.GetZ(); }
         INLINE Vector3 GetTranslation() const { return m_translation; }
         INLINE const Matrix3& GetBasis() const { return (const Matrix3&)*this; }
+        INLINE Scalar GetUniformScale() const;
 
         static INLINE AffineTransform MakeXRotation( float angle ) { return AffineTransform(Matrix3::MakeXRotation(angle)); }
         static INLINE AffineTransform MakeYRotation( float angle ) { return AffineTransform(Matrix3::MakeYRotation(angle)); }
@@ -213,4 +214,12 @@ namespace Math
         Matrix3 m_basis;
         Vector3 m_translation;
     };
+
+    INLINE Scalar AffineTransform::GetUniformScale() const
+    {
+        Scalar scaleXSqr = Scalar(XMVector3LengthSq((Vector3)m_basis.GetX()));
+        Scalar scaleYSqr = Scalar(XMVector3LengthSq((Vector3)m_basis.GetY()));
+        Scalar scaleZSqr = Scalar(XMVector3LengthSq((Vector3)m_basis.GetZ()));
+        return Scalar(XMVectorSqrt(XMVectorMax(XMVectorMax(scaleXSqr, scaleYSqr), scaleZSqr)));
+    }
 }

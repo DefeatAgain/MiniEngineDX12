@@ -397,21 +397,21 @@ void ColorBuffer::Destroy()
     PixelBuffer::Destroy();
 
     if (mSRVHandle)
-        Graphics::DeAllocateDescriptor(mSRVHandle, 1);
+        DEALLOC_DESCRIPTOR(mSRVHandle, 1);
     if (mRTVHandle)
-        Graphics::DeAllocateDescriptor(mRTVHandle, 1);
+        DEALLOC_DESCRIPTOR(mRTVHandle, 1);
     if (mUAVHandle)
-        Graphics::DeAllocateDescriptor(mUAVHandle, 1);
+        DEALLOC_DESCRIPTOR(mUAVHandle, 1);
 }
 
 void ColorBuffer::CreateFromSwapChain(const std::wstring& name, ID3D12Resource* baseResource)
 {
     AssociateWithResource(name, baseResource, D3D12_RESOURCE_STATE_PRESENT);
 
-    //m_UAVHandle[0] = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    //m_UAVHandle[0] = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     //Graphics::g_Device->CreateUnorderedAccessView(m_pResource.Get(), nullptr, nullptr, m_UAVHandle[0]);
 
-    mRTVHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    mRTVHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     Graphics::gDevice->CreateRenderTargetView(mResource.Get(), nullptr, mRTVHandle);
 }
 
@@ -505,8 +505,8 @@ void ColorBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t arraySize, uin
 
     if (!mSRVHandle)
     {
-        mRTVHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-        mSRVHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        mRTVHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        mSRVHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     ID3D12Resource* resource = mResource.Get();
@@ -518,7 +518,7 @@ void ColorBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t arraySize, uin
     Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mSRVHandle);
 
     if (!mUAVHandle)
-        mUAVHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        mUAVHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     Graphics::gDevice->CreateUnorderedAccessView(resource, nullptr, &uavDesc, mUAVHandle);
 }
 
@@ -529,7 +529,7 @@ void ColorBuffer::GenerateMipMaps()
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     uavDesc.Texture2D.MipSlice = 0;
 
-    DescriptorHandle uavHandle = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mNumMipMaps);
+    DescriptorHandle uavHandle = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mNumMipMaps);
     // Create the UAVs for each mip level (RWTexture2D)
     for (uint32_t i = 0; i <= mNumMipMaps; ++i)
     {
@@ -539,7 +539,7 @@ void ColorBuffer::GenerateMipMaps()
 
     PushGraphicsTaskSync(&ColorBuffer::GenerateMipMapsTask, this, std::cref(uavHandle));
 
-    Graphics::DeAllocateDescriptor(uavHandle, mNumMipMaps);
+    DEALLOC_DESCRIPTOR(uavHandle, mNumMipMaps);
 }
 
 CommandList* ColorBuffer::GenerateMipMapsTask(CommandList* commandList, const DescriptorHandle& uavHandle)
@@ -612,9 +612,12 @@ void DepthBuffer::Destroy()
 {
     PixelBuffer::Destroy();
 
-    Graphics::DeAllocateDescriptor(mDSV, mHasStencilView ? 4 : 2);
-    Graphics::DeAllocateDescriptor(mDepthSRV, 1);
-    Graphics::DeAllocateDescriptor(mStencilSRV, 1);
+    if (mDSV)
+        DEALLOC_DESCRIPTOR(mDSV, mHasStencilView ? 4 : 2);
+    if (mDepthSRV)
+        DEALLOC_DESCRIPTOR(mDepthSRV, 1);
+    if (mStencilSRV)
+        DEALLOC_DESCRIPTOR(mStencilSRV, 1);
 }
 
 void DepthBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t numMips, DXGI_FORMAT format)
@@ -655,7 +658,7 @@ void DepthBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t numMips)
     mHasStencilView = stencilReadFormat != DXGI_FORMAT_UNKNOWN;
 
     if (!mDSV)
-        mDSV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, mHasStencilView ? 4 : 2);
+        mDSV = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, mHasStencilView ? 4 : 2);
 
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
     Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV);
@@ -677,8 +680,8 @@ void DepthBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t numMips)
     //    mDSV[3] = mDSV[1];
     //}
 
-    if (mDepthSRV)
-        mDepthSRV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (!mDepthSRV)
+        mDepthSRV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // Create the shader resource view
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -698,7 +701,7 @@ void DepthBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t numMips)
     if (mHasStencilView)
     {
         if (!mStencilSRV)
-            mStencilSRV = Graphics::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            mStencilSRV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
         srvDesc.Format = stencilReadFormat;
         Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mStencilSRV);

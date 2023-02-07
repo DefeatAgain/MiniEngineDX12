@@ -46,9 +46,9 @@ void MeshManager::UpdateMeshes()
     cpuBuffer[kIndexBuffer].Create(L"IB Cpu", totalIndexSize);
 
     // copy to upload buffer
-    size_t curVertexBufferOffset = 0;
-    size_t curDepthVertexBufferOffset = 0;
-    size_t curIndexBufferOffset = 0;
+    uint32_t curVertexBufferOffset = 0;
+    uint32_t curDepthVertexBufferOffset = 0;
+    uint32_t curIndexBufferOffset = 0;
     for (size_t i = curMeshIndex; i < mAllMeshs.size(); i++, curMeshIndex++)
     {
         Mesh& mesh = mAllMeshs[i];
@@ -71,7 +71,7 @@ void MeshManager::UpdateMeshes()
     mDepthVertexBufferOffset += curDepthVertexBufferOffset;
 }
 
-void MeshManager::ReserveBuffer(size_t vertexBufferSize, size_t depthVertexBufferSize, size_t indexBufferSize)
+void MeshManager::ReserveBuffer(uint32_t vertexBufferSize, uint32_t depthVertexBufferSize, uint32_t indexBufferSize)
 {
     bool needReserve = false;
     GpuBuffer newGpuBuffer[kNumBufferTypes];
@@ -98,7 +98,7 @@ void MeshManager::ReserveBuffer(size_t vertexBufferSize, size_t depthVertexBuffe
         return;
 
     CommandQueueManager::GetInstance()->GetGraphicsQueue().WaitForIdle();
-    PushGraphicsTaskSync(&MeshManager::ReserveMeshBufferTask, this);
+    PushGraphicsTaskSync(&MeshManager::ReserveMeshBufferTask, this, newGpuBuffer);
 
     if (newGpuBuffer[kVertexBuffer].GetBufferSize() != 0)
         mGpuBuffer[kVertexBuffer] = newGpuBuffer[kVertexBuffer];

@@ -9,6 +9,8 @@
 #include <rapidjson/stringbuffer.h>
 
 #include <string>
+#include <filesystem>
+#include <d3d12.h>
 
 namespace glTF
 {

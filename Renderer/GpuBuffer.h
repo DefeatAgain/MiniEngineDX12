@@ -6,7 +6,7 @@
 class CommandList;
 class UploadBuffer;
 
-class GpuBuffer : public GpuResource, CopyContext
+class GpuBuffer : public GpuResource, public Graphics::CopyContext
 {
 public:
     GpuBuffer() : mBufferSize(0), mElementCount(0), mElementSize(0)

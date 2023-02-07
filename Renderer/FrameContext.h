@@ -15,7 +15,7 @@ struct MutiGraphicsCommand
 {
     //eRenderPoint mRenderPoint;
     D3D12_COMMAND_LIST_TYPE mRenderType;
-    GraphicsContext::GraphicsTask mRenderTask;
+    Graphics::GraphicsContext::GraphicsTask mRenderTask;
 };
 
 
@@ -50,7 +50,7 @@ private:
     CommandQueue* mQueueProduce; 
 
     std::vector<MutiGraphicsCommand> mGraphicsTask;
-    std::queue<std::future<GraphicsContext::GraphicsTask::result_type>> mFutureQueue;
+    std::queue<std::future<Graphics::GraphicsContext::GraphicsTask::result_type>> mFutureQueue;
     std::vector<ID3D12CommandList*> mFinalCommandLists;
     std::map<size_t, ResourceStateCache> mFrameResourceStateCache;
 };
@@ -64,7 +64,7 @@ public:
     template<typename Renderable, typename ...Args>
     Renderable* RegisterContext(Args&& ...args)
     {
-        static_assert(std::is_base_of_v<MutiGraphicsContext, Renderable>);
+        static_assert(std::is_base_of_v<Graphics::MutiGraphicsContext, Renderable>);
 
         auto renderable = std::make_unique<Renderable>(std::forward<Args>(args)...);
         auto ptr = renderable.get();
@@ -79,9 +79,9 @@ public:
         mGlobalResrouce[name] = resource;
     }
 
-    uint64_t CommitAsyncCopyTask(const GraphicsContext::GraphicsTask& copyTask);
-    uint64_t CommitAsyncComputeTask(const GraphicsContext::GraphicsTask& computeTask);
-    uint64_t CommitAsyncGraphicsTask(const GraphicsContext::GraphicsTask& graphicsTask);
+    uint64_t CommitAsyncCopyTask(const Graphics::GraphicsContext::GraphicsTask& copyTask);
+    uint64_t CommitAsyncComputeTask(const Graphics::GraphicsContext::GraphicsTask& computeTask);
+    uint64_t CommitAsyncGraphicsTask(const Graphics::GraphicsContext::GraphicsTask& graphicsTask);
 
     ColorBuffer& GetCurrentSwapChain();
     ColorBuffer& GetCurrentSceneColorBuffer();
@@ -117,7 +117,7 @@ private:
     std::list<std::unique_ptr<CommandList>> mUsingCommandLists[Graphics::NUM_RENDER_TASK_TYPE];
     std::list<std::unique_ptr<CommandList>> mRetiredCommandLists[Graphics::NUM_RENDER_TASK_TYPE];
 
-    std::unordered_map<size_t, std::unique_ptr<MutiGraphicsContext>> mGraphicsContexts;
+    std::unordered_map<size_t, std::unique_ptr<Graphics::MutiGraphicsContext>> mGraphicsContexts;
     std::unordered_map<std::string, GpuResource*> mGlobalResrouce;
 };
 
@@ -126,4 +126,5 @@ private:
 #define CURRENT_SCENE_COLOR_BUFFER FrameContextManager::GetInstance()->GetCurrentSceneColorBuffer()
 #define CURRENT_SCENE_DEPTH_BUFFER FrameContextManager::GetInstance()->GetCurrentSceneDepthBuffer()
 #define CURRENT_SCENE_COLOR_BUFFER_INDEX FrameContextManager::GetInstance()->GetCurFrameContextIdx()
+#define REGISTER_CONTEXT(Renderable, ...) FrameContextManager::GetInstance()->RegisterContext<Renderable>(__VA_ARGS__);
 #define PUSH_MUTIRENDER_TASK(...) FrameContextManager::GetInstance()->PushMutiGraphicsTask(__VA_ARGS__);

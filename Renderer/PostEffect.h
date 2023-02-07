@@ -6,7 +6,7 @@ namespace PostEffectRender
 
 }
 
-class PostEffect : public MutiGraphicsContext
+class PostEffect : public Graphics::MutiGraphicsContext
 {
 public:
     PostEffect(float bufferWidth, float bufferHeight);

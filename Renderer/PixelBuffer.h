@@ -7,7 +7,7 @@
 
 class CommandList;
 
-class PixelBuffer : public GpuResource, public CopyContext
+class PixelBuffer : public GpuResource, public Graphics::CopyContext
 {
 public:
     PixelBuffer() : mWidth(0), mHeight(0), mArraySize(0), mNumMipMaps(0), mFormat(DXGI_FORMAT_UNKNOWN) {}

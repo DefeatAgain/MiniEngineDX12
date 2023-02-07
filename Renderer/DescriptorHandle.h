@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreHeader.h"
+#include "Common.h"
 
 class DescriptorHandle;
 
@@ -59,34 +60,12 @@ private:
     std::vector<SubHeap*> mDescriptorHeapPool;
 };
 
-namespace Graphics
-{
-    inline DescriptorAllocator gDescriptorAllocator[]=
-    {
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
-        D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-        D3D12_DESCRIPTOR_HEAP_TYPE_DSV
-    };
-
-    inline DescriptorHandle AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE type, UINT count = 1)
-    {
-        return gDescriptorAllocator[type].Allocate(count);
-    }
-
-    inline void DeAllocateDescriptor(DescriptorHandle& handle, UINT count)
-    {
-        Graphics::gDescriptorAllocator[handle.mType].Deallocate(handle, count);
-    }
-};
-
-
 #define UNKNOWN_OFFSET (((uint64_t)-1) >> 10)
 
 class DescriptorHandle
 {
     friend class DescriptorAllocator;
-    friend void Graphics::DeAllocateDescriptor(DescriptorHandle&, UINT);
+    friend class DescriptorAllocatorManager;
 
     friend DescriptorHandle operator+(const DescriptorHandle& handle, INT offset)
     {
@@ -163,7 +142,8 @@ public:
     }
 
     D3D12_DESCRIPTOR_HEAP_TYPE GetType() const { return (D3D12_DESCRIPTOR_HEAP_TYPE)mType; }
-    ID3D12DescriptorHeap* GetDescriptorHeap() const { return Graphics::gDescriptorAllocator[mType].GetHeap(mOwningHeapIndex); }
+
+    ID3D12DescriptorHeap* GetDescriptorHeap() const;
 
     operator bool() const { return mOffset == UNKNOWN_OFFSET; }
 
@@ -195,20 +175,53 @@ public:
         return gpuHandle;
     }
 
-    size_t GetCpuPtr() const
-    {
-        return Graphics::gDescriptorAllocator[mType].GetHeapCpuStart(mOwningHeapIndex).ptr +
-            (mOffset * Graphics::gDescriptorAllocator[mType].mDescriptorSize);
-    }
+    size_t GetCpuPtr() const;
 
-    uint64_t GetGpuPtr() const
-    {
-        return Graphics::gDescriptorAllocator[mType].GetHeapGpuStart(mOwningHeapIndex).ptr +
-            (mOffset * Graphics::gDescriptorAllocator[mType].mDescriptorSize);
-    }
+    uint64_t GetGpuPtr() const;
 private:
     uint64_t mOffset : 44;
     uint64_t mOwningHeapIndex : 8;
     uint64_t mType : 2;
     //DescriptorAllocator::SubHeap* mOwningHeap;
 };
+
+
+class DescriptorAllocatorManager : public Singleton<DescriptorAllocatorManager>
+{
+    USE_SINGLETON;
+
+    DescriptorAllocatorManager() 
+    {
+        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
+        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+    }
+public:
+    ~DescriptorAllocatorManager() 
+    {
+        for (size_t i = 0; i < mDescriptorAllocators.size(); i++)
+        {
+            delete mDescriptorAllocators[i];
+        }
+    }
+
+    DescriptorHandle AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE type, UINT count = 1)
+    {
+        return mDescriptorAllocators[type]->Allocate(count);
+    }
+
+    void DeAllocateDescriptor(DescriptorHandle& handle, UINT count)
+    {
+        mDescriptorAllocators[handle.mType]->Deallocate(handle, count);
+    }
+
+    DescriptorAllocator& GetAlloc(D3D12_DESCRIPTOR_HEAP_TYPE type) { return *mDescriptorAllocators[type]; }
+private:
+    std::vector<DescriptorAllocator*> mDescriptorAllocators;
+};
+
+#define GET_DESCRIPTOR_ALLOC(type) DescriptorAllocatorManager::GetInstance()->GetAlloc(type)
+#define ALLOC_DESCRIPTOR(type, count) DescriptorAllocatorManager::GetInstance()->AllocateDescriptor(type, count)
+#define ALLOC_DESCRIPTOR1(type) ALLOC_DESCRIPTOR(type, 1)
+#define DEALLOC_DESCRIPTOR(handle, count) DescriptorAllocatorManager::GetInstance()->DeAllocateDescriptor(handle, count)

@@ -126,6 +126,7 @@
     <ClInclude Include="Utils\DirectXTex\filters.h" />
     <ClInclude Include="Utils\DirectXMesh\DirectXMesh.h" />
     <ClInclude Include="Utils\DirectXMesh\DirectXMeshP.h" />
+    <ClInclude Include="Utils\DirectXMesh\scoped.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Math\Functions.inl" />

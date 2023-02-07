@@ -40,9 +40,8 @@ namespace GameApp
         Graphics::InitializeSwapChain(); // need commandQueue
 
         // TextContext As built-in context
-        FrameContextManager* frameContextMgr = FrameContextManager::GetInstance();
-        frameContextMgr->RegisterContext<PostEffect>(Graphics::gRenderWidth, Graphics::gRenderHeight);
-        TextRenderer::gTextContext = frameContextMgr->RegisterContext<TextContext>(Graphics::gDisplayWidth, Graphics::gDisplayHeight);
+        REGISTER_CONTEXT(PostEffect, Graphics::gRenderWidth, Graphics::gRenderHeight);
+        TextRenderer::gTextContext = REGISTER_CONTEXT(TextContext, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
         game.RegisterContext();
 
         Graphics::InitializeResource();
@@ -84,7 +83,7 @@ namespace GameApp
 
         Graphics::Present();
 
-        //FrameMark;
+        FrameMark;
 
         return !game.IsDone();
     }
@@ -154,6 +153,7 @@ namespace GameApp
 
     void InitSingleton()
     {
+        DescriptorAllocatorManager::GetOrCreateInstance();
         CommandQueueManager::GetOrCreateInstance();
         FrameContextManager::GetOrCreateInstance();
         RootSignatureManager::GetOrCreateInstance();
@@ -172,6 +172,7 @@ namespace GameApp
         ShaderCompositor::RemoveInstance();
         TextureManager::RemoveInstance();
         SamplerManager::RemoveInstance();
+        DescriptorAllocatorManager::RemoveInstance();
     }
 
     LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

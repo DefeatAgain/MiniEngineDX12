@@ -11,7 +11,29 @@
 #include "Utils/DirectXMesh/DirectXMesh.h"
 #include "Utils/ThreadPoolExecutor.h"
 
-static std::unique_ptr<Scene> sScenePtr;
+static std::unordered_map<std::wstring, std::filesystem::path> sIBLTexturePaths;
+
+static uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
+{
+#define SetFlag(BitIdx) (1 << (BitIdx - 1))
+    switch (type)
+    {
+    case PBRMaterial::kBaseColor:
+        return SetFlag(kSRGB) | SetFlag(kDefaultBC) | alpha ? SetFlag(kPreserveAlpha) : 0;
+    case PBRMaterial::kMetallicRoughness:
+        return SetFlag(kDefaultBC);
+    case PBRMaterial::kOcclusion:
+        return SetFlag(kDefaultBC);
+    case PBRMaterial::kEmissive:
+        return SetFlag(kSRGB);
+    case PBRMaterial::kNormal: // Use BC5 Compression
+        return SetFlag(kDefaultBC);
+    case PBRMaterial::kNumTextures:
+    default:
+        return kNoneTextureFlag;
+#undef SetFlag
+    }
+}
 
 static DXGI_FORMAT AccessorFormat(const glTF::Accessor& accessor)
 {
@@ -45,6 +67,31 @@ static DXGI_FORMAT AccessorFormat(const glTF::Accessor& accessor)
     }
 }
 
+static void LoadIBLTextures()
+{
+    std::filesystem::path imagePath = L"Asset/IBLTextures";
+    for (auto& p : std::filesystem::directory_iterator(imagePath))
+    {
+        std::filesystem::path filePath = p.path();
+        std::wstring filestem = filePath.stem().c_str();
+        size_t diffuseIdx = filestem.rfind(L"_diffuseIBL.dds");
+        if (diffuseIdx != std::wstring::npos)
+        {
+            std::wstring realname = filestem.substr(0, diffuseIdx) + L"_D";
+            GET_TEX(filePath);
+            sIBLTexturePaths[realname] = filePath;
+        }
+
+        size_t specularIdx = filestem.rfind(L"_specularIBL.dds");
+        if (specularIdx != std::wstring::npos)
+        {
+            std::wstring realname = filestem.substr(0, specularIdx) + L"_S";
+            GET_TEX(filePath);
+            sIBLTexturePaths[realname] = filePath;
+        }
+    }
+}
+
 struct GeometryData
 {
     std::unique_ptr<byte[]> VB;
@@ -58,29 +105,17 @@ struct GeometryData
 
 namespace ModelConverter
 {
-    inline uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
+    std::filesystem::path GetIBLTexture(const std::wstring& name)
     {
-#define SetFlag(BitIdx) (1 << (BitIdx - 1))
-        switch (type)
+        auto findIter = sIBLTexturePaths.find(name);
+        ASSERT(findIter != sIBLTexturePaths.end())
         {
-        case PBRMaterial::kBaseColor:
-            return SetFlag(kSRGB) | SetFlag(kDefaultBC) | alpha ? SetFlag(kPreserveAlpha) : 0;
-        case PBRMaterial::kMetallicRoughness:
-            return SetFlag(kDefaultBC);
-        case PBRMaterial::kOcclusion:
-            return SetFlag(kDefaultBC);
-        case PBRMaterial::kEmissive:
-            return SetFlag(kSRGB);
-        case PBRMaterial::kNormal: // Use BC5 Compression
-            return SetFlag(kDefaultBC);
-        case PBRMaterial::kNumTextures:
-        default:
-            return kNoneTextureFlag;
-#undef SetFlag
+            return findIter->second;
         }
+        return std::filesystem::path();
     }
 
-	void BuildMaterials(const glTF::Asset& asset)
+    void BuildMaterials(const glTF::Asset& asset)
 	{
         MaterialManager* matMgr = MaterialManager::GetOrCreateInstance();
         matMgr->Reserve(asset.m_materials.size());
@@ -131,6 +166,8 @@ namespace ModelConverter
                     GetTextureFlag(ti, (gltfMat.alphaBlend | gltfMat.alphaTest) && ti == PBRMaterial::kBaseColor));
             }
         }
+
+        LoadIBLTextures();
 	}
 
     GeometryData BuildSubMesh(const glTF::Primitive& primitive, SubMesh& subMesh)
@@ -552,9 +589,10 @@ namespace ModelConverter
             model.mCurIndex = curNode->linearIdx;
             model.mParentIndex = curIndex;
             
+            Math::Matrix4 modelXForm;
             if (curNode->hasMatrix)
             {
-                CopyMemory((float*)&model.mXform, curNode->matrix, sizeof(curNode->matrix));
+                CopyMemory((float*)&modelXForm, curNode->matrix, sizeof(curNode->matrix));
             }
             else
             {
@@ -562,21 +600,25 @@ namespace ModelConverter
                 XMFLOAT3 scale;
                 CopyMemory((float*)&rot, curNode->rotation, sizeof(curNode->rotation));
                 CopyMemory((float*)&scale, curNode->scale, sizeof(curNode->scale));
-                model.mXform = Matrix4(
+                modelXForm = Matrix4(
                     Matrix3(rot) * Matrix3::MakeScale(scale),
                     Vector3(*(const XMFLOAT3*)curNode->translation)
                 );
             }
+            const AffineTransform& affineTrans = (const AffineTransform&)modelXForm;
+            Math::Quaternion q(modelXForm);
+            Math::UniformTransform localTrans(q, affineTrans.GetUniformScale(), affineTrans.GetTranslation());
+            model.mLocalTrans = localTrans;
 
-            const Matrix4 LocalXform = xform * model.mXform;
+            const Matrix4 LocalXform = xform * modelXForm;
 
             if (!curNode->pointsToCamera && curNode->mesh != nullptr)
             {
                 model.mMesh = GET_MESH(curNode->mesh->index);
 
-                Scalar scaleXSqr = LengthSquare((Vector3)xform.GetX());
-                Scalar scaleYSqr = LengthSquare((Vector3)xform.GetY());
-                Scalar scaleZSqr = LengthSquare((Vector3)xform.GetZ());
+                Scalar scaleXSqr = LengthSquare((Vector3)LocalXform.GetX());
+                Scalar scaleYSqr = LengthSquare((Vector3)LocalXform.GetY());
+                Scalar scaleZSqr = LengthSquare((Vector3)LocalXform.GetZ());
                 Scalar sphereScale = Sqrt(Max(Max(scaleXSqr, scaleYSqr), scaleZSqr));
 
                 Vector3 sphereCenter(*(Math::XMFLOAT3*)model.mMesh->bounds);
@@ -600,18 +642,13 @@ namespace ModelConverter
         }
     }
 
-    Scene* BuildScene(const glTF::Asset& asset)
+    void BuildScene(Scene* scene, const glTF::Asset& asset)
     {
-        if (sScenePtr)
-            return sScenePtr.get();
-        
-        sScenePtr = std::make_unique<Scene>();
-        sScenePtr->mModels.resize(asset.m_nodes.size());
-        sScenePtr->mModelTransform.resize(asset.m_nodes.size());
+        scene->GetModels().resize(asset.m_nodes.size());
+        scene->GetModelTranforms().resize(asset.m_nodes.size());
 
-        const glTF::Scene* gltfScene = asset.m_scene; // only one scene
-        WalkGraph(sScenePtr->mModels, gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
-
-        return sScenePtr.get();
+        const glTF::Scene* gltfScene = asset.m_scene; 
+        // only one scene
+        WalkGraph(scene->GetModels(), gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
     }
 };

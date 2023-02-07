@@ -13,10 +13,10 @@ public:
     Model() {}
 	~Model() {}
 
-    void Render(MeshRenderer& sorter, const Math::UniformTransform& transform,
+    void Render(MeshRenderer& sorter, const Math::AffineTransform& transform,
         D3D12_GPU_VIRTUAL_ADDRESS meshCBV) const;
 
-    Math::Matrix4 mXform;
+    Math::UniformTransform mLocalTrans;
     //Math::XMFLOAT3 position;
     //Math::Quaternion rotation;
     //Math::XMFLOAT3 scale;

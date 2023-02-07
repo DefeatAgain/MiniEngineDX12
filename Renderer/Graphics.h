@@ -45,9 +45,6 @@ namespace Graphics
     bool IsDeviceAMD(ID3D12Device* pDevice);
     bool IsDeviceIntel(ID3D12Device* pDevice);
 
-    DescriptorHandle AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE type, UINT count = 1);
-    void DeAllocateDescriptor(DescriptorHandle& handle, UINT count);
-
     extern HWND ghWnd;
     extern Microsoft::WRL::ComPtr<ID3D12Device> gDevice;
 

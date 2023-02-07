@@ -21,7 +21,7 @@ enum eTextureFlags : uint16_t
 //inline uint16_t SetTextureFlags(bool sRGB = false, bool alpha = false, bool isNormalMap = false, bool bumpToNormal = false)
 
 
-class Texture : public GpuResource, public CopyContext
+class Texture : public GpuResource, public Graphics::CopyContext
 {
 public:
     Texture(const std::wstring& name = L"Textrue") : mWidth(1), mHeight(1), mDepth(1), mName(name) {}
