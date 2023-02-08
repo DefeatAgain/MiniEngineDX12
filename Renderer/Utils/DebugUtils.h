@@ -60,8 +60,12 @@ namespace Utility
 #ifdef _DEBUG
     #define CheckHR(hr) \
         { \
-            Utility::CheckHResult(hr, __FILEW__, (DWORD)__LINE__); \
-            if (FAILED(hr)) __debugbreak(); \
+            if (FAILED(hr)) \
+            { \
+                Utility::PrintMessage(L"hr = 0x%08X", hr); \
+                Utility::PrintMessage(L"HRESULT failed in " STRINGIFY_BUILTIN(__FILEW__) " Line: " STRINGIFY_BUILTIN(__LINE__) " \n"); \
+                __debugbreak(); \
+            } \
         } 
 
     #define WARN_IF( isTrue, ... ) \

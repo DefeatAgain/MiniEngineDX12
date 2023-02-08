@@ -46,5 +46,9 @@ VSOutput main(VSInput vsInput)
     vsOutput.normalWorld = mul(gWorldITMatrix, vsInput.normal * 2.0 - 1.0);
     vsOutput.tangetWorld = float4(mul(gWorldITMatrix, vsInput.tanget.xyz * 2.0 - 1.0), vsInput.tanget.w);
     vsOutput.shadowCoord = mul(gShadowFinalMatrix, float4(vsOutput.positionWorld, 1.0)).xy;
+    vsOutput.uv0 = vsInput.uv0;
+#ifdef SECOND_UV
+    vsOutput.uv1 = vsInput.uv1;
+#endif
     return vsOutput;
 }
