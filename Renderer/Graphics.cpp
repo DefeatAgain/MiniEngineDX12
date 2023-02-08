@@ -260,7 +260,11 @@ namespace Graphics
         ASSERT(sSwapChain1 == nullptr, "Graphics has already been initialized");
 
         Microsoft::WRL::ComPtr<IDXGIFactory4> dxgiFactory;
-        CheckHR(CreateDXGIFactory2(0, IID_PPV_ARGS(dxgiFactory.GetAddressOf())));
+        DWORD dxgiFactoryFlags = 0;
+#ifdef _DEBUG
+        dxgiFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
+#endif
+        CheckHR(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.GetAddressOf())));
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
         swapChainDesc.Width = gDisplayWidth;

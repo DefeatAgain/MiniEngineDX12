@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __PBRUTILITY_HLSLI__
+#define __PBRUTILITY_HLSLI__
 #include "../Constants.hlsli"
 
 float3 SchlickFresnel(float3 R0, float3 wm, float3 wi)
@@ -57,7 +58,7 @@ float GeometrySmith(float3 N, float3 wo, float3 wi, float roughness)
 float3 ComputeNormal(Texture2D<float3> normalTexture, SamplerState normalSampler, 
     float2 uv, float3 normal, float4 tangent, float normalTextureScale)
 {
-    float3 normal = normalize(normal);
+    normal = normalize(normal);
     // Construct tangent frame
     float3 T = normalize(tangent.xyz);
     float3 B = normalize(cross(normal, T)) * tangent.w;
@@ -71,3 +72,5 @@ float3 ComputeNormal(Texture2D<float3> normalTexture, SamplerState normalSampler
     // Multiply by transpose (reverse order)
     return mul(normal, tangentFrame);
 }
+
+#endif // __PBRUTILITY_HLSLI__

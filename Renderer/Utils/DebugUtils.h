@@ -1,8 +1,6 @@
 #pragma once
 #include "../CoreHeader.h"
 
-#define USE_BREAK
-
 
 namespace Utility
 {
@@ -48,9 +46,6 @@ namespace Utility
 		{
 			PrintMessage(L"hr = 0x%08X", hr);
 			PrintMessage(L"HRESULT failed in %s Line:%d \n", file, line);
-#ifdef USE_BREAK
-            __debugbreak();
-#endif
 		}
 	}
 };
@@ -66,6 +61,7 @@ namespace Utility
     #define CheckHR(hr) \
         { \
             Utility::CheckHResult(hr, __FILEW__, (DWORD)__LINE__); \
+            if (FAILED(hr)) __debugbreak(); \
         } 
 
     #define WARN_IF( isTrue, ... ) \

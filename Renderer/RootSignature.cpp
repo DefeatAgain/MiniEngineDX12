@@ -84,6 +84,11 @@ void RootSignature::Finalize(D3D12_ROOT_SIGNATURE_FLAGS flags)
         Microsoft::WRL::ComPtr<ID3DBlob> pOutBlob, pErrorBlob;
         CheckHR(D3D12SerializeRootSignature(
             &mRootDesc, D3D_ROOT_SIGNATURE_VERSION_1, pOutBlob.GetAddressOf(), pErrorBlob.GetAddressOf()));
+        if (pErrorBlob)
+        {
+            ::OutputDebugStringA((char*)pErrorBlob->GetBufferPointer());
+        }
+
         CheckHR(Graphics::gDevice->CreateRootSignature(
             0, pOutBlob->GetBufferPointer(), pOutBlob->GetBufferSize(), IID_PPV_ARGS(mD3dRootSignature.GetAddressOf())));
 

@@ -1,4 +1,5 @@
 #include "ModelConverter.h"
+#include "CoreHeader.h"
 #include "glTF.h"
 #include "Material.h"
 #include "Texture.h"

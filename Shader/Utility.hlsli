@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __UTILITY_HLSLI__
+#define __UTILITY_HLSLI__
 
 // ========================= color space utility =========================-
 
@@ -577,3 +578,5 @@ float4 UnpackRGBM( uint p, bool sRGB = true )
     return rgbm;
 }
 // ========================= pixel packing utility =========================-
+
+# endif //  __UTILITY_HLSLI__

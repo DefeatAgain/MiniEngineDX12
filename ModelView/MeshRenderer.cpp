@@ -63,27 +63,27 @@ namespace ModelRenderer
             sForwardRootSig->GetParam(kMaterialConstants).InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_PIXEL);
             sForwardRootSig->GetParam(kGlobalConstants).InitAsConstantBuffer(1, D3D12_SHADER_VISIBILITY_ALL);
 
-#define InitTexture(SRV) sForwardRootSig->GetParam(SRV).InitAsDescriptorRange( \
-            D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL)
-#define InitSampler(SAMPLER) sForwardRootSig->GetParam(SAMPLER).InitAsDescriptorRange( \
-            D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL)
+#define InitTexture(SRV, Register) sForwardRootSig->GetParam(SRV).InitAsDescriptorRange( \
+            D3D12_DESCRIPTOR_RANGE_TYPE_SRV, Register, 1, D3D12_SHADER_VISIBILITY_PIXEL)
+#define InitSampler(SAMPLER, Register) sForwardRootSig->GetParam(SAMPLER).InitAsDescriptorRange( \
+            D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, Register, 1, D3D12_SHADER_VISIBILITY_PIXEL)
 
-            InitTexture(kBaseColorTextureSRV);
-            InitTexture(kMetallicRoughnessTextureSRV);
-            InitTexture(kOcclusionTextureSRV);
-            InitTexture(kEmissiveTextureSRV);
-            InitTexture(kNormalTextureSRV);
+            InitTexture(kBaseColorTextureSRV, 0);
+            InitTexture(kMetallicRoughnessTextureSRV, 1);
+            InitTexture(kOcclusionTextureSRV, 2);
+            InitTexture(kEmissiveTextureSRV, 3);
+            InitTexture(kNormalTextureSRV, 4);
 
-            InitSampler(kBaseColorTextureSampler);
-            InitSampler(kMetallicTextureSampler);
-            InitSampler(kOcclusionTextureSampler);
-            InitSampler(kEmissiveTextureSampler);
-            InitSampler(kNormalTextureSampler);
+            InitSampler(kBaseColorTextureSampler, 0);
+            InitSampler(kMetallicTextureSampler, 1);
+            InitSampler(kOcclusionTextureSampler, 2);
+            InitSampler(kEmissiveTextureSampler, 3);
+            InitSampler(kNormalTextureSampler, 4);
 
-            InitTexture(kRadianceIBLTexture);
-            InitTexture(kIrradianceIBLTexture);
-            InitTexture(kPreComputeGGXBRDFTexture);
-            InitTexture(kTexSunShadowTexture);
+            InitTexture(kRadianceIBLTexture, 10);
+            InitTexture(kIrradianceIBLTexture, 11);
+            InitTexture(kPreComputeGGXBRDFTexture, 12);
+            InitTexture(kTexSunShadowTexture, 13);
 #undef InitTexture
 #undef InitSampler
             sForwardRootSig->Finalize(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
