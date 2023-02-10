@@ -17,7 +17,7 @@ struct VSInput
     float3 position : POSITION;
     float3 normal : NORMAL;
     float4 tanget : TANGENT;
-    float3 uv0 : TEXCOORD0;
+    float2 uv0 : TEXCOORD0;
 #ifdef SECOND_UV
     float2 uv1 : TEXCOORD1;
 #endif

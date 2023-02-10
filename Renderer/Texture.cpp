@@ -208,16 +208,21 @@ void Texture::CreatePIXImageFromMemory(const void* memBuffer, size_t fileSize)
 
 bool Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags)
 {
-    if (filepath.extension() != L".dds")
+    std::filesystem::path newPath = filepath.replace_extension(L".dds");
+    if (!std::filesystem::exists(newPath) && filepath.extension() != L".dds")
     {
         ASSERT(ConvertToDDS(filepath, flags));
     }
+    else
+    {
+        filepath = newPath;
+    }
 
     std::shared_ptr<std::vector<D3D12_SUBRESOURCE_DATA>> subresources = std::make_shared<std::vector<D3D12_SUBRESOURCE_DATA>>();
-    std::shared_ptr<std::vector<uint8_t>> ddsData;
+    std::shared_ptr<std::vector<uint8_t>> ddsData = std::make_shared<std::vector<uint8_t>>();
     bool isCubeMap;
     HRESULT hr = DirectX::LoadDDSTextureFromFile(
-        Graphics::gDevice.Get(), filepath.replace_extension(L".dds").c_str(), mResource.GetAddressOf(), *ddsData, *subresources,
+        Graphics::gDevice.Get(), newPath.c_str(), mResource.GetAddressOf(), *ddsData, *subresources,
         0, nullptr, &isCubeMap);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
@@ -282,6 +287,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
     bool bBlockCompress = GetFlag(kDefaultBC);
     bool bUseBestBC = GetFlag(kQualityBC);
     bool bFlipImage = GetFlag(kFlipVertical);
+    bool bGenerateMipMaps = GetFlag(kGenerateMipMaps);
 #undef GetFlag
 
     ASSERT(!bInterpretAsSRGB || !bContainsNormals);
@@ -337,6 +343,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
         if (FAILED(hr))
         {
             Utility::PrintMessage("Could not flip image \"%ws\" (%08X).\n", filepath.generic_string().c_str(), hr);
+            return false;
         }
         else
         {
@@ -378,6 +385,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
         if (FAILED(hr))
         {
             Utility::PrintMessage("Could not convert \"%ws\" (%08X).\n", filepath.generic_string().c_str(), hr);
+            return false;
         }
         else
         {
@@ -386,7 +394,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
         }
     }
 
-    if (info.mipLevels == 1)
+    if (bGenerateMipMaps && info.mipLevels == 1)
     {
         std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
 
@@ -395,6 +403,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
         if (FAILED(hr))
         {
             Utility::PrintMessage("Failing generating mimaps for \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
+            return false;
         }
         else
         {
@@ -408,6 +417,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
         {
             Utility::PrintMessage("Texture size (%Iux%Iu) not a multiple of 4 \"%ws\", so skipping compress\n", 
                 info.width, info.height, filepath.generic_string().c_str());
+            return false;
         }
         else
         {
@@ -418,6 +428,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
             if (FAILED(hr))
             {
                 Utility::PrintMessage("Failing compressing \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
+                return false;
             }
             else
             {
@@ -430,6 +441,7 @@ bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
     HRESULT hr = SaveToDDSFile(image->GetImages(), image->GetImageCount(), image->GetMetadata(), DDS_FLAGS_NONE, newPath.c_str());
     if (FAILED(hr))
     {
+        ASSERT(false);
         Utility::PrintMessage("Could not write texture to file \"%ws\" (%08X).\n", newPath.generic_string().c_str(), hr);
         return false;
     }

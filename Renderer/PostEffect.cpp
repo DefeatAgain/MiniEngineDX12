@@ -44,7 +44,7 @@ namespace PostEffectRender
             sPresentSDRPS->SetSampleMask(D3D12_DEFAULT_SAMEPLE_MASK);
             sPresentSDRPS->SetInputLayout(0, nullptr);
             sPresentSDRPS->SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-            sPresentSDRPS->SetVertexShader(GET_SHADER("ScreenQuadPresentVS"));
+            sPresentSDRPS->SetVertexShader(GET_SHADER("ScreenQuadCommonVS"));
             sPresentSDRPS->SetPixelShader(GET_SHADER("PresentSDRPS"));
             sPresentSDRPS->SetRenderTargetFormat(SWAP_CHAIN_FORMAT, DXGI_FORMAT_UNKNOWN);
             sPresentSDRPS->Finalize();

@@ -4,6 +4,7 @@
 #include "GpuBuffer.h"
 
 class CommandList;
+class GraphicsCommandList;
 
 struct SubMesh
 {
@@ -74,8 +75,11 @@ public:
     ~MeshManager() {}
 
     Mesh& AddUnInitializedMesh();
+    void AddMesh(Mesh&& mesh);
 
     void UpdateMeshes();
+
+    void TransitionStateToRead(GraphicsCommandList& ghCommandList);
 
     D3D12_GPU_VIRTUAL_ADDRESS GetVBVirtualAddr() { return mGpuBuffer[kVertexBuffer].GetGpuVirtualAddress(); }
     D3D12_GPU_VIRTUAL_ADDRESS GetDepthVBVirtualAddr() { return mGpuBuffer[kDepthVertexBuffer].GetGpuVirtualAddress(); }

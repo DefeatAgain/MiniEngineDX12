@@ -16,6 +16,7 @@ enum eTextureFlags : uint16_t
     kDefaultBC = 0x10,    // Apply standard block compression (BC1-5)
     kQualityBC = 0x20,    // Apply quality block compression (BC6H/7)
     kFlipVertical = 0x40,
+    kGenerateMipMaps = 0x80
 };
 
 //inline uint16_t SetTextureFlags(bool sRGB = false, bool alpha = false, bool isNormalMap = false, bool bumpToNormal = false)

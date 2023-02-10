@@ -129,7 +129,7 @@ namespace ModelRenderer
             depthOnlyPSO->SetRootSignature(*sForwardRootSig);
             depthOnlyPSO->SetRasterizerState(Graphics::RasterizerDefault);
             depthOnlyPSO->SetBlendState(Graphics::BlendNoColorWrite);
-            depthOnlyPSO->SetDepthStencilState(Graphics::DepthStateDisabled);
+            depthOnlyPSO->SetDepthStencilState(Graphics::DepthStateReadWrite);
             depthOnlyPSO->SetInputLayout(ARRAYSIZE(posOnly), posOnly);
             depthOnlyPSO->SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
             depthOnlyPSO->SetVertexShader(GET_SHADER("DepthOnlyVS"));

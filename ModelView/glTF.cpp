@@ -20,14 +20,14 @@ void glTF::Asset::ProcessNodes( json& nodes )
 
     uint32_t nodeIdx = 0;
 
-    for (json::ConstMemberIterator it = nodes.MemberBegin(); it != nodes.MemberEnd(); ++it)
+    for (json::ConstValueIterator it = nodes.Begin(); it != nodes.End(); ++it)
     {
         glTF::Node& node = m_nodes[nodeIdx++];
-        json& thisNode = it->value;
+        json& thisNode = *it;
 
         node.flags = 0;
         node.mesh = nullptr;
-        node.linearIdx = it - nodes.MemberBegin();
+        node.linearIdx = it - nodes.Begin();
 
         if (thisNode.HasMember("camera"))
         {
@@ -103,18 +103,18 @@ void glTF::Asset::ProcessScenes( json& scenes )
     m_scenes.resize(scenes.GetArray().Size());
 
     size_t sceneIdx = 0;
-    for (json::ConstMemberIterator it = scenes.MemberBegin(); it != scenes.MemberEnd(); ++it, ++sceneIdx)
+    for (json::ConstValueIterator it = scenes.Begin(); it != scenes.End(); ++it, ++sceneIdx)
     {
         glTF::Scene& scene = m_scenes[sceneIdx];
-        json& thisScene = it->value;
+        json& thisScene = *it;
 
         if (thisScene.HasMember("nodes"))
         {
             json& nodes = thisScene["nodes"];
             scene.nodes.resize(nodes.GetArray().Size());
             uint32_t nodeIdx = 0;
-            for (json::ConstMemberIterator nodesIt = nodes.MemberBegin(); nodesIt != nodes.MemberEnd(); ++nodesIt, ++nodeIdx)
-                scene.nodes[nodeIdx] = &m_nodes[nodesIt->value.GetUint()];
+            for (json::ConstValueIterator nodesIt = nodes.Begin(); nodesIt != nodes.End(); ++nodesIt, ++nodeIdx)
+                scene.nodes[nodeIdx] = &m_nodes[nodesIt->GetUint()];
         }
     }
 }
@@ -124,10 +124,10 @@ void glTF::Asset::ProcessCameras( json& cameras )
     m_cameras.resize(cameras.GetArray().Size());
 
     size_t camIdx = 0;
-    for (json::ConstMemberIterator it = cameras.MemberBegin(); it != cameras.MemberEnd(); ++it, ++camIdx)
+    for (json::ConstValueIterator it = cameras.Begin(); it != cameras.End(); ++it, ++camIdx)
     {
         glTF::Camera& camera = m_cameras[camIdx];
-        json& thisCamera = it->value;
+        json& thisCamera = *it;
 
         if (thisCamera["type"] == "perspective")
         {
@@ -170,10 +170,10 @@ void glTF::Asset::ProcessAccessors( json& accessors )
     m_accessors.resize(accessors.GetArray().Size());
 
     size_t accessorIdx = 0;
-    for (json::ConstMemberIterator it = accessors.MemberBegin(); it != accessors.MemberEnd(); ++it, ++accessorIdx)
+    for (json::ConstValueIterator it = accessors.Begin(); it != accessors.End(); ++it, ++accessorIdx)
     {
         glTF::Accessor& accessor = m_accessors[accessorIdx];
-        json& thisAccessor = it->value;
+        json& thisAccessor = *it;
 
         glTF::BufferView& bufferView = m_bufferViews[thisAccessor["bufferView"].GetUint()];
         accessor.dataPtr = m_buffers[bufferView.buffer].get()->data() + bufferView.byteOffset;
@@ -209,20 +209,20 @@ void glTF::Asset::ProcessMeshes( json& meshes, json& accessors )
     m_meshes.resize(meshes.GetArray().Size());
 
     uint32_t curMesh = 0;
-    for (json::ConstMemberIterator meshIt = meshes.MemberBegin(); meshIt != meshes.MemberEnd(); ++meshIt, ++curMesh)
+    for (json::ConstValueIterator meshIt = meshes.Begin(); meshIt != meshes.End(); ++meshIt, ++curMesh)
     {
-        json& thisMesh = meshIt->value;
+        json& thisMesh = *meshIt;
         json& primitives = thisMesh["primitives"];
 
         m_meshes[curMesh].primitives.resize(primitives.GetArray().Size());
         m_meshes[curMesh].skin = -1;
-        m_meshes[curMesh].index = meshIt - meshes.MemberBegin();
+        m_meshes[curMesh].index = meshIt - meshes.Begin();
 
         uint32_t curSubMesh = 0;
-        for (json::ConstMemberIterator primIt = primitives.MemberBegin(); primIt != primitives.MemberEnd(); ++primIt, ++curSubMesh)
+        for (json::ConstValueIterator primIt = primitives.Begin(); primIt != primitives.End(); ++primIt, ++curSubMesh)
         {
             glTF::Primitive& prim = m_meshes[curMesh].primitives[curSubMesh];
-            json& thisPrim = primIt->value;
+            json& thisPrim = *primIt;
 
             prim.attribMask = 0;
             json& attributes = thisPrim["attributes"];
@@ -273,10 +273,10 @@ void glTF::Asset::ProcessSkins( json& skins )
     m_skins.resize(skins.GetArray().Size());
 
     uint32_t skinIdx = 0;
-    for (json::ConstMemberIterator it = skins.MemberBegin(); it != skins.MemberEnd(); ++it, ++skinIdx)
+    for (json::ConstValueIterator it = skins.Begin(); it != skins.End(); ++it, ++skinIdx)
     {
         glTF::Skin& skin = m_skins[skinIdx];
-        json& thisSkin = it->value;
+        json& thisSkin = *it;
 
         skin.inverseBindMatrices = nullptr;
         skin.skeleton = nullptr;
@@ -293,8 +293,8 @@ void glTF::Asset::ProcessSkins( json& skins )
         json& joints = thisSkin["joints"];
         skin.joints.resize(joints.GetArray().Size());
         uint32_t jointIdx = 0;
-        for (json::ConstMemberIterator jointIt = joints.MemberBegin(); jointIt != joints.MemberEnd(); ++jointIt, ++jointIdx)
-            skin.joints[jointIdx] = &m_nodes[jointIt->value.GetUint()];
+        for (json::ConstValueIterator jointIt = joints.Begin(); jointIt != joints.End(); ++jointIt, ++jointIdx)
+            skin.joints[jointIdx] = &m_nodes[jointIt->GetUint()];
     }
 }
 
@@ -324,11 +324,10 @@ void glTF::Asset::ProcessMaterials( json& materials )
     m_materials.resize(materials.GetArray().Size());
 
     uint32_t materialIdx = 0;
-
-    for (json::ConstMemberIterator it = materials.MemberBegin(); it != materials.MemberEnd(); ++it)
+    for (json::ConstValueIterator it = materials.Begin(); it != materials.End(); ++it)
     {
         glTF::Material& material = m_materials[materialIdx];
-        json& thisMaterial = it->value;
+        json& thisMaterial = *it;
 
         material.index = materialIdx++;
         material.flags = 0;
@@ -405,9 +404,9 @@ void glTF::Asset::ProcessBuffers( json& buffers, ByteArray chunk1bin )
 {
     m_buffers.reserve(buffers.GetArray().Size());
 
-    for (json::ConstMemberIterator it = buffers.MemberBegin(); it != buffers.MemberEnd(); ++it)
+    for (json::ConstValueIterator it = buffers.GetArray().Begin(); it != buffers.End(); ++it)
     {
-        json& thisBuffer = it->value;
+        json& thisBuffer = *it;
 
         if (thisBuffer.HasMember("uri"))
         {
@@ -415,11 +414,12 @@ void glTF::Asset::ProcessBuffers( json& buffers, ByteArray chunk1bin )
             std::filesystem::path filepath = m_basePath / uri;
 
             //ASSERT(ba->size() > 0, "Missing bin file %ws", filepath.c_str());
-            m_buffers.emplace_back(Utility::ReadFileAsync(filepath));
+
+            m_buffers.emplace_back(Utility::ReadFileSync(filepath));
         }
         else
         {
-            ASSERT(it == buffers.MemberBegin(), "Only the 1st buffer allowed to be internal");
+            ASSERT(it == buffers.GetArray().Begin(), "Only the 1st buffer allowed to be internal");
             ASSERT(chunk1bin->size() > 0, "GLB chunk1 missing data or not a GLB file");
             m_trunkBuffer = chunk1bin;
         }
@@ -428,13 +428,13 @@ void glTF::Asset::ProcessBuffers( json& buffers, ByteArray chunk1bin )
 
 void glTF::Asset::ProcessBufferViews( json& bufferViews )
 {
-    m_bufferViews.reserve(bufferViews.GetArray().Size());
+    m_bufferViews.resize(bufferViews.GetArray().Size());
 
     uint32_t bufViewIdx = 0;
-    for (json::ConstMemberIterator it = bufferViews.MemberBegin(); it != bufferViews.MemberEnd(); ++it, ++bufViewIdx)
+    for (json::ConstValueIterator it = bufferViews.Begin(); it != bufferViews.End(); ++it, ++bufViewIdx)
     {
         glTF::BufferView& bufferView = m_bufferViews[bufViewIdx];
-        json& thisBufferView = it->value;
+        json& thisBufferView = *it;
 
         bufferView.buffer = thisBufferView["buffer"].GetUint();
         bufferView.byteLength = thisBufferView["byteLength"].GetUint();
@@ -459,9 +459,9 @@ void glTF::Asset::ProcessImages( json& images )
     m_images.resize(images.GetArray().Size());
 
     uint32_t imageIdx = 0;
-    for (json::ConstMemberIterator it = images.MemberBegin(); it != images.MemberEnd(); ++it)
+    for (json::ConstValueIterator it = images.Begin(); it != images.End(); ++it)
     {
-        json& thisImage = it->value;
+        json& thisImage = *it;
         if (thisImage.HasMember("uri"))
         {
             m_images[imageIdx++].path = thisImage["uri"].GetString();
@@ -528,9 +528,9 @@ void glTF::Asset::ProcessSamplers( json& samplers )
     m_samplers.resize(samplers.GetArray().Size());
 
     uint32_t samplerIdx = 0;
-    for (json::ConstMemberIterator it = samplers.MemberBegin(); it != samplers.MemberEnd(); ++it)
+    for (json::ConstValueIterator it = samplers.Begin(); it != samplers.End(); ++it)
     {
-        json& thisSampler = it->value;
+        json& thisSampler = *it;
 
         glTF::Sampler& sampler = m_samplers[samplerIdx++];
         sampler.filter = D3D12_FILTER_ANISOTROPIC;
@@ -562,10 +562,10 @@ void glTF::Asset::ProcessTextures( json& textures )
 
     uint32_t texIdx = 0;
 
-    for (json::ConstMemberIterator it = textures.MemberBegin(); it != textures.MemberEnd(); ++it)
+    for (json::ConstValueIterator it = textures.Begin(); it != textures.End(); ++it)
     {
         glTF::Texture& texture = m_textures[texIdx++];
-        json& thisTexture = it->value;
+        json& thisTexture = *it;
 
         texture.source = nullptr;
         texture.sampler = nullptr;
@@ -584,9 +584,9 @@ void glTF::Asset::ProcessAnimations(json& animations)
 
     uint32_t animIdx = 0;
     // Process all animations
-    for (json::ConstMemberIterator it = animations.MemberBegin(); it != animations.MemberEnd(); ++it)
+    for (json::ConstValueIterator it = animations.Begin(); it != animations.End(); ++it)
     {
-        json& thisAnimation = it->value;
+        json& thisAnimation = *it;
         glTF::Animation& animation = m_animations[animIdx++];
 
         // Process this animation's samplers
@@ -594,9 +594,9 @@ void glTF::Asset::ProcessAnimations(json& animations)
         animation.m_samplers.resize(samplers.GetArray().Size());
         uint32_t samplerIdx = 0;
 
-        for (json::ConstMemberIterator it2 = samplers.MemberBegin(); it2 != samplers.MemberEnd(); ++it2)
+        for (json::ConstValueIterator it2 = samplers.Begin(); it2 != samplers.End(); ++it2)
         {
-            json& thisSampler = it2->value;
+            json& thisSampler = *it2;
             glTF::AnimSampler& sampler = animation.m_samplers[samplerIdx++];
             sampler.m_input = &m_accessors[thisSampler["input"].GetUint()];
             sampler.m_output = &m_accessors[thisSampler["output"].GetUint()];
@@ -620,9 +620,9 @@ void glTF::Asset::ProcessAnimations(json& animations)
         animation.m_channels.resize(channels.GetArray().Size());
         uint32_t channelIdx = 0;
 
-        for (json::ConstMemberIterator it2 = channels.MemberBegin(); it2 != channels.MemberEnd(); ++it2)
+        for (json::ConstValueIterator it2 = channels.Begin(); it2 != channels.End(); ++it2)
         {
-            json& thisChannel = it2->value;
+            json& thisChannel = *it2;
             glTF::AnimChannel& channel = animation.m_channels[channelIdx++];
             channel.m_sampler = &animation.m_samplers[thisChannel["sampler"].GetUint()];
             json& thisTarget = thisChannel["target"];

@@ -3,11 +3,13 @@
 #include "MeshRenderer.h"
 #include "FrameContext.h"
 #include "Graphics.h"
+#include "Mesh.h"
 #include "PixelBuffer.h"
 #include "PipelineState.h"
 
 void Scene::Startup()
 {
+    mSceneBoundingSphere = Math::BoundingSphere(kZero);
     mSceneCamera.SetZRange(1.0f, 10000.0f);
     mDirtyModels = true;
 
@@ -23,6 +25,8 @@ void Scene::Startup()
 CommandList* Scene::RenderScene(CommandList* context)
 {
     GraphicsCommandList& ghContext = context->GetGraphicsCommandList().Begin();
+
+    MeshManager::GetInstance()->TransitionStateToRead(ghContext);
 
     float costheta = cosf(mSunDirectionTheta);
     float sintheta = sinf(mSunDirectionTheta);

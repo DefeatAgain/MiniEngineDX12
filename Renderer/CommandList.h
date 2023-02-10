@@ -155,6 +155,8 @@ public:
 
     void CopyBuffer(GpuResource& dest, GpuResource& src);
     void CopyBufferRegion(GpuResource& dest, size_t destOffset, GpuResource& src, size_t srcOffset, size_t numBytes);
+    void CopyBuffer(GpuResource& dest, UploadBuffer& src);
+    void CopyBufferRegion(GpuResource& dest, size_t destOffset, UploadBuffer& src, size_t srcOffset, size_t numBytes);
     void CopySubresource(GpuResource& dest, UINT destSubIndex, GpuResource& src, UINT srcSubIndex);
     void CopyCounter(GpuResource& dest, size_t destOffset, StructuredBuffer& src);
     void CopyTextureRegion(GpuResource& dest, UINT x, UINT y, UINT z, GpuResource& source, RECT& rect);

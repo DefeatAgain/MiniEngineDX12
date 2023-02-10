@@ -36,7 +36,7 @@ namespace Graphics
         template<typename F, typename ...Args>
         static GraphicsTask PushGraphicsTaskBind(F&& f, Args&&... args)
         {
-            ASSERT(std::this_thread::get_id() == main_thread_id);
+            WARN_IF_NOT(std::this_thread::get_id() == main_thread_id, L"NOT IN MAIN THREAD!");
             return PushGraphicsTaskBindImpl(std::forward<F>(f), std::forward<Args>(args)...);
         }
     protected:

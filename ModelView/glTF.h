@@ -233,7 +233,7 @@ namespace glTF
         std::vector<Accessor> m_accessors;
         std::vector<Skin> m_skins;
         std::vector<Material> m_materials;
-        std::vector<std::future<ByteArray>> m_buffers;
+        std::vector<ByteArray> m_buffers;
         ByteArray m_trunkBuffer;
         std::vector<BufferView> m_bufferViews;
         std::vector<Animation> m_animations;

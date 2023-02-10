@@ -364,6 +364,20 @@ void CopyCommandList::CopyBufferRegion(GpuResource& dest, size_t destOffset, Gpu
     mCommandList->CopyBufferRegion(dest.GetResource(), destOffset, src.GetResource(), srcOffset, numBytes);
 }
 
+void CopyCommandList::CopyBuffer(GpuResource& dest, UploadBuffer& src)
+{
+    TransitionResource(dest, D3D12_RESOURCE_STATE_COPY_DEST);
+    FlushResourceBarriers();
+    mCommandList->CopyResource(dest.GetResource(), src.GetResource());
+}
+
+void CopyCommandList::CopyBufferRegion(GpuResource& dest, size_t destOffset, UploadBuffer& src, size_t srcOffset, size_t numBytes)
+{
+    TransitionResource(dest, D3D12_RESOURCE_STATE_COPY_DEST);
+    FlushResourceBarriers();
+    mCommandList->CopyBufferRegion(dest.GetResource(), destOffset, src.GetResource(), srcOffset, numBytes);
+}
+
 void CopyCommandList::CopySubresource(GpuResource& dest, UINT destSubIndex, GpuResource& src, UINT srcSubIndex)
 {
     FlushResourceBarriers();

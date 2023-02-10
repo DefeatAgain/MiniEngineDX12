@@ -10,7 +10,7 @@ TextureCube<float3> radianceIBLTexture      : register(t10);
 struct VSOutput
 {
     float4 position : SV_POSITION;
-    float3 viewDir : TEXCOORD3;
+    float3 viewDir : TEXCOORD;
 };
 
 [RootSignature(ForwardRendererRootSig)]

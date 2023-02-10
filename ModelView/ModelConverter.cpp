@@ -20,16 +20,15 @@ static uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
     switch (type)
     {
     case PBRMaterial::kBaseColor:
-        return SetFlag(kSRGB) | SetFlag(kDefaultBC) | alpha ? SetFlag(kPreserveAlpha) : 0;
+        return kSRGB | kDefaultBC | kGenerateMipMaps | (alpha ? kPreserveAlpha : 0);
     case PBRMaterial::kMetallicRoughness:
-        return SetFlag(kDefaultBC);
+        return kNoneTextureFlag;
     case PBRMaterial::kOcclusion:
-        return SetFlag(kDefaultBC);
+        return kNoneTextureFlag;
     case PBRMaterial::kEmissive:
-        return SetFlag(kSRGB);
+        return kSRGB;
     case PBRMaterial::kNormal: // Use BC5 Compression
-        return SetFlag(kDefaultBC);
-    case PBRMaterial::kNumTextures:
+        return kDefaultBC | kNormalMap;
     default:
         return kNoneTextureFlag;
 #undef SetFlag
@@ -146,7 +145,7 @@ namespace ModelConverter
             {
                 SamplerDesc texSampleDesc;
 
-                if (gltfMat.textures[ti]->sampler != nullptr)
+                if (gltfMat.textures[ti] && gltfMat.textures[ti]->sampler != nullptr)
                 {
                     texSampleDesc.AddressU = gltfMat.textures[ti]->sampler->wrapS;
                     texSampleDesc.AddressV = gltfMat.textures[ti]->sampler->wrapT;
@@ -161,6 +160,9 @@ namespace ModelConverter
                 }
 
                 pbrMat.mSamplers[ti] = GET_SAM_HANDLE(texSampleDesc);
+
+                if (gltfMat.textures[ti] == nullptr)
+                    continue;
 
                 std::filesystem::path imagePath = asset.m_basePath / gltfMat.textures[ti]->source->path;
                 pbrMat.mTextures[ti] = GET_TEXF(imagePath, 
@@ -497,77 +499,141 @@ namespace ModelConverter
         return geoData;
     }
 
+    Mesh BuildMesh(const glTF::Mesh& gltfMesh)
+    {
+        Mesh mesh;
+        mesh.subMeshes = std::make_unique<SubMesh[]>(gltfMesh.primitives.size());
+        mesh.subMeshCount = gltfMesh.primitives.size();
+
+        /*
+        //std::vector<std::future<GeometryData>> futureGeoData;
+        //std::vector<GeometryData> futureGeoData1;
+        //for (size_t pi = 0; pi < gltfMesh.primitives.size(); pi++)
+        //{
+        //    futureGeoData.emplace_back(Utility::gThreadPoolExecutor.Submit(
+        //        &BuildSubMesh, std::cref(gltfMesh.primitives[pi]), std::ref(mesh.subMeshes[pi])));
+        //}
+        //futureGeoData1.resize(futureGeoData.size());
+
+        //// calc all submesh size
+        //uint32_t startIndex = 0;
+        //uint32_t baseVertex = 0;
+        //uint32_t totalIndexSize = 0;
+        //uint32_t totalVertexSize = 0;
+        //uint32_t totaldepthVertexSize = 0;
+
+        //Math::AxisAlignedBox boundingBox;
+        //Math::BoundingSphere boundingSphere;
+        //for (size_t fi = 0; fi < futureGeoData.size(); fi++)
+        //{
+        //    const GeometryData& geoData = futureGeoData1.emplace_back(futureGeoData[fi].get());
+        //    SubMesh& submesh = mesh.subMeshes[fi];
+        //    submesh.baseVertex = baseVertex;
+        //    submesh.startIndex = startIndex;
+        //    baseVertex += geoData.vertexCount;
+        //    startIndex += submesh.indexCount;
+        //    totalIndexSize += geoData.indexBufferSize;
+        //    totalVertexSize += geoData.vertexBufferSize;
+        //    totaldepthVertexSize += geoData.depthVertexBufferSize;
+
+        //    Math::AxisAlignedBox aabbSub(submesh.minPos, submesh.maxPos);
+        //    Math::BoundingSphere shSub((const XMFLOAT4*)submesh.bounds);
+        //    boundingBox.AddBoundingBox(aabbSub);
+        //    boundingSphere.Union(shSub);
+        //}
+        //DirectX::XMStoreFloat4((XMFLOAT4*)mesh.bounds, (Vector4)boundingSphere);
+        //DirectX::XMStoreFloat3(&mesh.minPos, (Vector4)boundingBox.GetMin());
+        //DirectX::XMStoreFloat3(&mesh.maxPos, (Vector4)boundingBox.GetMax());
+
+        // copy all buffers to a single buffer
+        //mesh.sizeVB = totalVertexSize;
+        //mesh.sizeDepthVB = totaldepthVertexSize;
+        //mesh.sizeIB = totalIndexSize;
+        //mesh.VB = std::make_unique<byte[]>(totalVertexSize);
+        //mesh.DepthVB = std::make_unique<byte[]>(totaldepthVertexSize);
+        //mesh.IB = std::make_unique<byte[]>(totalIndexSize);
+        //uint32_t vertexBufferOffset = 0;
+        //uint32_t indexBufferOffset = 0;
+        //uint32_t depthVertexBufferOffset = 0;
+        //for (size_t fi = 0; fi < futureGeoData.size(); fi++)
+        //{
+        //    const GeometryData& geoData = futureGeoData1[fi];
+        //    CopyMemory(mesh.VB.get() + vertexBufferOffset, geoData.VB.get(), geoData.vertexBufferSize);
+        //    CopyMemory(mesh.DepthVB.get() + depthVertexBufferOffset, geoData.depthVB.get(), geoData.depthVertexBufferSize);
+        //    CopyMemory(mesh.IB.get() + indexBufferOffset, geoData.IB.get(), geoData.indexBufferSize);
+        //    vertexBufferOffset += geoData.vertexBufferSize;
+        //    depthVertexBufferOffset += geoData.depthVertexBufferSize;
+        //    indexBufferOffset += geoData.indexBufferSize;
+        //}
+        */
+
+        uint32_t startIndex = 0;
+        uint32_t baseVertex = 0;
+        uint32_t totalIndexSize = 0;
+        uint32_t totalVertexSize = 0;
+        uint32_t totaldepthVertexSize = 0;
+        Math::AxisAlignedBox boundingBox(kZero);
+        Math::BoundingSphere boundingSphere(kZero);
+        std::vector<GeometryData> allGeoData;
+        for (size_t pi = 0; pi < gltfMesh.primitives.size(); pi++)
+        {
+            GeometryData& geoData = allGeoData.emplace_back(BuildSubMesh(gltfMesh.primitives[pi], mesh.subMeshes[pi]));
+
+            SubMesh& submesh = mesh.subMeshes[pi];
+            submesh.baseVertex = baseVertex;
+            submesh.startIndex = startIndex;
+            baseVertex += geoData.vertexCount;
+            startIndex += submesh.indexCount;
+            totalIndexSize += geoData.indexBufferSize;
+            totalVertexSize += geoData.vertexBufferSize;
+            totaldepthVertexSize += geoData.depthVertexBufferSize;
+
+            Math::AxisAlignedBox aabbSub(submesh.minPos, submesh.maxPos);
+            Math::BoundingSphere shSub((const XMFLOAT4*)submesh.bounds);
+            boundingBox.AddBoundingBox(aabbSub);
+            boundingSphere = boundingSphere.Union(shSub);
+        }
+        DirectX::XMStoreFloat4((XMFLOAT4*)mesh.bounds, (Vector4)boundingSphere);
+        DirectX::XMStoreFloat3(&mesh.minPos, (Vector4)boundingBox.GetMin());
+        DirectX::XMStoreFloat3(&mesh.maxPos, (Vector4)boundingBox.GetMax());
+
+        // copy all buffers to a single buffer
+        mesh.sizeVB = totalVertexSize;
+        mesh.sizeDepthVB = totaldepthVertexSize;
+        mesh.sizeIB = totalIndexSize;
+        mesh.VB = std::make_unique<byte[]>(totalVertexSize);
+        mesh.DepthVB = std::make_unique<byte[]>(totaldepthVertexSize);
+        mesh.IB = std::make_unique<byte[]>(totalIndexSize);
+        uint32_t vertexBufferOffset = 0;
+        uint32_t indexBufferOffset = 0;
+        uint32_t depthVertexBufferOffset = 0;
+        for (size_t fi = 0; fi < allGeoData.size(); fi++)
+        {
+            const GeometryData& geoData = allGeoData[fi];
+            CopyMemory(mesh.VB.get() + vertexBufferOffset, geoData.VB.get(), geoData.vertexBufferSize);
+            CopyMemory(mesh.DepthVB.get() + depthVertexBufferOffset, geoData.depthVB.get(), geoData.depthVertexBufferSize);
+            CopyMemory(mesh.IB.get() + indexBufferOffset, geoData.IB.get(), geoData.indexBufferSize);
+            vertexBufferOffset += geoData.vertexBufferSize;
+            depthVertexBufferOffset += geoData.depthVertexBufferSize;
+            indexBufferOffset += geoData.indexBufferSize;
+        }
+
+        return mesh;
+    }
+
     void BuildAllMeshes(const glTF::Asset& asset)
     {
-        using namespace Math;
-
+        std::vector<std::future<Mesh>> meshBuildTasks;
         for (size_t i = 0; i < asset.m_meshes.size(); i++)
         {
             const glTF::Mesh& gltfMesh = asset.m_meshes[i];
-            Mesh& mesh = MeshManager::GetInstance()->AddUnInitializedMesh();
-            mesh.subMeshes = std::make_unique<SubMesh[]>(gltfMesh.primitives.size());
-            mesh.subMeshCount = gltfMesh.primitives.size();
+            //Mesh& mesh = MeshManager::GetInstance()->AddUnInitializedMesh();
 
-            std::vector<std::future<GeometryData>> futureGeoData;
-            std::vector<GeometryData> futureGeoData1;
-            for (size_t pi = 0; pi < gltfMesh.primitives.size(); pi++)
-            {
-                futureGeoData.emplace_back(Utility::gThreadPoolExecutor.Submit(
-                    &BuildSubMesh, std::cref(gltfMesh.primitives[pi]), std::ref(mesh.subMeshes[pi])));
-            }
-            futureGeoData1.resize(futureGeoData.size());
-
-            // calc all submesh size
-            uint32_t startIndex = 0;
-            uint32_t baseVertex = 0;
-            uint32_t totalIndexSize = 0;
-            uint32_t totalVertexSize = 0;
-            uint32_t totaldepthVertexSize = 0;
-
-            Math::AxisAlignedBox boundingBox;
-            Math::BoundingSphere boundingSphere;
-            for (size_t fi = 0; fi < futureGeoData.size(); fi++)
-            {
-                const GeometryData& geoData = futureGeoData1.emplace_back(futureGeoData[fi].get());
-                SubMesh& submesh = mesh.subMeshes[fi];
-                submesh.baseVertex = baseVertex;
-                submesh.startIndex = startIndex;
-                baseVertex += geoData.vertexCount;
-                startIndex += submesh.indexCount;
-                totalIndexSize += geoData.indexBufferSize;
-                totalVertexSize += geoData.vertexBufferSize;
-                totaldepthVertexSize += geoData.depthVertexBufferSize;
-
-                Math::AxisAlignedBox aabbSub(submesh.minPos, submesh.maxPos);
-                Math::BoundingSphere shSub((const XMFLOAT4*)submesh.bounds);
-                boundingBox.AddBoundingBox(aabbSub);
-                boundingSphere.Union(shSub);
-            }
-            DirectX::XMStoreFloat4((XMFLOAT4*)mesh.bounds, (Vector4)boundingSphere);
-            DirectX::XMStoreFloat3(&mesh.minPos, (Vector4)boundingBox.GetMin());
-            DirectX::XMStoreFloat3(&mesh.maxPos, (Vector4)boundingBox.GetMax());
-
-            // copy all buffers to a single buffer
-            mesh.sizeVB = totalVertexSize;
-            mesh.sizeDepthVB = totaldepthVertexSize;
-            mesh.sizeIB = totalIndexSize;
-            mesh.VB = std::make_unique<byte[]>(totalVertexSize);
-            mesh.DepthVB = std::make_unique<byte[]>(totaldepthVertexSize);
-            mesh.IB = std::make_unique<byte[]>(totalIndexSize);
-            uint32_t vertexBufferOffset = 0;
-            uint32_t indexBufferOffset = 0;
-            uint32_t depthVertexBufferOffset = 0;
-            for (size_t fi = 0; fi < futureGeoData.size(); fi++)
-            {
-                const GeometryData& geoData = futureGeoData1[fi];
-                CopyMemory(mesh.VB.get() + vertexBufferOffset, geoData.VB.get(), geoData.vertexBufferSize);
-                CopyMemory(mesh.DepthVB.get() + depthVertexBufferOffset, geoData.depthVB.get(), geoData.depthVertexBufferSize);
-                CopyMemory(mesh.IB.get() + indexBufferOffset, geoData.IB.get(), geoData.indexBufferSize);
-                vertexBufferOffset += geoData.vertexBufferSize;
-                depthVertexBufferOffset += geoData.depthVertexBufferSize;
-                indexBufferOffset += geoData.indexBufferSize;
-            }
+            meshBuildTasks.emplace_back(Utility::gThreadPoolExecutor.Submit(&BuildMesh, std::cref(gltfMesh)));
         }
+
+        for (size_t i = 0; i < meshBuildTasks.size(); i++)
+            MeshManager::GetInstance()->AddMesh(std::move(meshBuildTasks[i].get()));
 
         MeshManager::GetInstance()->UpdateMeshes();
     }
@@ -650,6 +716,6 @@ namespace ModelConverter
 
         const glTF::Scene* gltfScene = asset.m_scene; 
         // only one scene
-        WalkGraph(scene->GetModels(), gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
+        WalkGraph(scene->GetModels(), gltfScene->nodes, 0, Math::Matrix4(Math::kIdentity));
     }
 };

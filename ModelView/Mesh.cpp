@@ -18,6 +18,14 @@ Mesh& MeshManager::AddUnInitializedMesh()
     return mesh;
 }
 
+void MeshManager::AddMesh(Mesh&& mesh)
+{
+    mNeedUpdate = true;
+
+    mesh.meshIndex = mAllMeshs.size();
+    mAllMeshs.push_back(std::move(mesh));
+}
+
 void MeshManager::UpdateMeshes()
 {
     if (!mNeedUpdate)
@@ -71,6 +79,13 @@ void MeshManager::UpdateMeshes()
     mDepthVertexBufferOffset += curDepthVertexBufferOffset;
 }
 
+void MeshManager::TransitionStateToRead(GraphicsCommandList& ghCommandList)
+{
+    ghCommandList.TransitionResource(mGpuBuffer[kVertexBuffer], D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+    ghCommandList.TransitionResource(mGpuBuffer[kIndexBuffer], D3D12_RESOURCE_STATE_INDEX_BUFFER);
+    ghCommandList.TransitionResource(mGpuBuffer[kVertexBuffer], D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+}
+
 void MeshManager::ReserveBuffer(uint32_t vertexBufferSize, uint32_t depthVertexBufferSize, uint32_t indexBufferSize)
 {
     bool needReserve = false;
@@ -117,18 +132,17 @@ CommandList* MeshManager::UpdateMeshBufferTask(CommandList* commandList, UploadB
         cpuBuffer[kIndexBuffer].GetBufferSize());
     copyList.CopyBufferRegion(mGpuBuffer[kDepthVertexBuffer], mDepthVertexBufferOffset, cpuBuffer[kDepthVertexBuffer], 0 , 
         cpuBuffer[kDepthVertexBuffer].GetBufferSize());
-
     return commandList;
 }
 
 CommandList* MeshManager::ReserveMeshBufferTask(CommandList* commandList, GpuBuffer newBuffer[kNumBufferTypes])
 {
     CopyCommandList& copyList = commandList->GetCopyCommandList().Begin(L"Reserve mesh buffer");
-    if (newBuffer[kVertexBuffer].GetBufferSize() != 0)
+    if (mGpuBuffer[kVertexBuffer].GetBufferSize() > 0 && newBuffer[kVertexBuffer].GetBufferSize() != 0)
         copyList.CopyBuffer(mGpuBuffer[kVertexBuffer], newBuffer[kVertexBuffer]);
-    if (newBuffer[kIndexBuffer].GetBufferSize() != 0)
+    if (mGpuBuffer[kVertexBuffer].GetBufferSize() > 0 && newBuffer[kIndexBuffer].GetBufferSize() != 0)
         copyList.CopyBuffer(mGpuBuffer[kIndexBuffer], newBuffer[kIndexBuffer]);
-    if (newBuffer[kDepthVertexBuffer].GetBufferSize() != 0)
+    if (mGpuBuffer[kVertexBuffer].GetBufferSize() > 0 && newBuffer[kDepthVertexBuffer].GetBufferSize() != 0)
         copyList.CopyBuffer(mGpuBuffer[kDepthVertexBuffer], newBuffer[kDepthVertexBuffer]);
 
     return commandList;
