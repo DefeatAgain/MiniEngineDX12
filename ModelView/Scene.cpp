@@ -7,15 +7,24 @@
 #include "PixelBuffer.h"
 #include "PipelineState.h"
 
+void Scene::Destroy()
+{
+    if (mSceneTextures)
+        DEALLOC_DESCRIPTOR(mSceneTextures, eForwardSceneTexture::kNumTextures);
+}
+
 void Scene::Startup()
 {
     mSceneBoundingSphere = Math::BoundingSphere(kZero);
     mSceneCamera.SetZRange(1.0f, 10000.0f);
     mDirtyModels = true;
 
-    UpdateModels();
+    mCameraController.reset(new FlyingFPSCamera(mSceneCamera, Vector3(kYUnitVector)));
+    mMeshConstantsUploader.Create(L"Mesh Constants Buffer", Math::AlignUp(sizeof(ModelConstants), 256) * mModelTransform.size());
 
-    mCameraController.reset(new OrbitCamera(mSceneCamera, mSceneBoundingSphere, Vector3(kYUnitVector)));
+    mSceneTextures = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, eForwardSceneTexture::kNumTextures);
+
+    UpdateModels();
 
     mSunDirectionTheta = 0.75f;
     mSunDirectionPhi = -0.5f;
@@ -24,7 +33,7 @@ void Scene::Startup()
 
 CommandList* Scene::RenderScene(CommandList* context)
 {
-    GraphicsCommandList& ghContext = context->GetGraphicsCommandList().Begin();
+    GraphicsCommandList& ghContext = context->GetGraphicsCommandList().Begin(L"Render Scene");
 
     MeshManager::GetInstance()->TransitionStateToRead(ghContext);
 
@@ -51,6 +60,7 @@ CommandList* Scene::RenderScene(CommandList* context)
 
     MeshRenderer meshRenderer(MeshRenderer::kDefault);
     meshRenderer.SetCamera(mSceneCamera);
+    meshRenderer.SetScene(*this);
     meshRenderer.SetViewport(Graphics::GetDefaultViewPort());
     meshRenderer.SetScissor(Graphics::GetDefaultScissor());
     meshRenderer.SetDepthStencilTarget(depthBuffer);
@@ -67,6 +77,7 @@ CommandList* Scene::RenderScene(CommandList* context)
 
     MeshRenderer shadowRenderer(MeshRenderer::kShadows);
     ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
+    shadowRenderer.SetScene(*this);
     shadowRenderer.SetCamera(mShadowCamera);
     shadowRenderer.SetDepthStencilTarget(shadowBuffer);
 
@@ -79,7 +90,7 @@ CommandList* Scene::RenderScene(CommandList* context)
     shadowRenderer.Sort();
     shadowRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
 
-    ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     ghContext.ClearColor(colorBuffer);
 
     //context->TransitionResource(g_SSAOFullScreen, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -92,6 +103,7 @@ CommandList* Scene::RenderScene(CommandList* context)
 
     meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kTransparent);
 
+    ghContext.Finish();
     return context;
 }
 
@@ -124,7 +136,7 @@ void Scene::RenderSkyBox(GraphicsCommandList& ghContext)
     //context->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_TextureHeap.GetHeapPointer());
     ghContext.SetDynamicConstantBufferView(ModelRenderer::kMeshConstants, sizeof(SkyboxVSCB), &skyVSCB);
     ghContext.SetDynamicConstantBufferView(ModelRenderer::kMaterialConstants, sizeof(SkyboxPSCB), &skyPSCB);
-    ghContext.SetDescriptorTable(ModelRenderer::kRadianceIBLTexture, mRadianceCubeMap.GetSRV());
+    ghContext.SetDescriptorTable(ModelRenderer::kSceneTextures, mSceneTextures);
     ghContext.Draw(3);
 }
 
@@ -140,12 +152,31 @@ void Scene::Render()
     PUSH_MUTIRENDER_TASK({ D3D12_COMMAND_LIST_TYPE_DIRECT, PushGraphicsTaskBind(&Scene::RenderScene, this) });
 }
 
+void Scene::SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL)
+{
+    ASSERT(diffuseIBL && specularIBL);
+
+    mRadianceCubeMap = specularIBL;
+    mIrradianceCubeMap = diffuseIBL;
+
+    if (!diffuseIBL.IsValid())
+        const_cast<Texture*>(diffuseIBL.Get())->ForceWaitContext();
+    Graphics::gDevice->CreateShaderResourceView(const_cast<Texture*>(diffuseIBL.Get())->GetResource(), nullptr, mSceneTextures);
+
+    if (!specularIBL.IsValid())
+        const_cast<Texture*>(specularIBL.Get())->ForceWaitContext();
+    Graphics::gDevice->CreateShaderResourceView(const_cast<Texture*>(specularIBL.Get())->GetResource(), nullptr, mSceneTextures + 1);
+}
+
 void Scene::UpdateModels()
 {
     if (!mDirtyModels)
         return;
 
     ASSERT(mModelTransform.size() == mModels.size());
+
+    void* modelTransBuffer = mMeshConstantsUploader.Map();
+    size_t bufferSize = Math::AlignUp(sizeof(ModelConstants), 256);
 
     for (size_t i = 0; i < mModels.size(); i++)
     {
@@ -161,6 +192,11 @@ void Scene::UpdateModels()
             mModelTransform[i] = transformAffine;
         }
 
+        ModelConstants modelConstants;
+        modelConstants.World = mModelTransform[i];
+        modelConstants.WorldIT = Math::Transpose(Math::Invert(modelConstants.World)).Get3x3();
+
+        CopyMemory((uint8_t*)modelTransBuffer + i * bufferSize, &modelConstants, sizeof(ModelConstants));
         Math::BoundingSphere boundingSphere(mModelTransform[i].GetTranslation(), mModelTransform[i].GetUniformScale());
         model.m_BSOS = boundingSphere;
         model.m_BBoxOS = Math::AxisAlignedBox::CreateFromSphere(boundingSphere);

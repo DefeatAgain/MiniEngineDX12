@@ -10,10 +10,195 @@
 
 #include <chrono>
 
-static UINT BytesPerPixel(_In_ DXGI_FORMAT Format)
+namespace
 {
-    return (UINT)BitsPerPixel(Format) / 8;
-};
+    UINT BytesPerPixel(_In_ DXGI_FORMAT Format)
+    {
+        return (UINT)BitsPerPixel(Format) / 8;
+    };
+
+    struct LoadedTextureData
+    {
+        bool mIsCubeMap;
+        std::shared_ptr<std::vector<D3D12_SUBRESOURCE_DATA>> subresources;
+        std::shared_ptr<std::vector<uint8_t>> ddsData;
+    };
+
+    bool ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
+    {
+        using namespace DirectX;
+
+#define GetFlag(f) ((flags & f) != 0)
+        bool bInterpretAsSRGB = GetFlag(kSRGB);
+        bool bPreserveAlpha = GetFlag(kPreserveAlpha);
+        bool bContainsNormals = GetFlag(kNormalMap);
+        bool bBumpMap = GetFlag(kBumpToNormal);
+        bool bBlockCompress = GetFlag(kDefaultBC);
+        bool bUseBestBC = GetFlag(kQualityBC);
+        bool bFlipImage = GetFlag(kFlipVertical);
+        bool bGenerateMipMaps = GetFlag(kGenerateMipMaps);
+#undef GetFlag
+
+        ASSERT(!bInterpretAsSRGB || !bContainsNormals);
+        ASSERT(!bPreserveAlpha || !bContainsNormals);
+
+        std::filesystem::path ext = filepath.extension();
+        TexMetadata info;
+        std::unique_ptr<ScratchImage> image = std::make_unique<ScratchImage>();
+
+        bool isHDR = false;
+        if (ext == L"tga")
+        {
+            HRESULT hr = LoadFromTGAFile(filepath.c_str(), &info, *image);
+            if (FAILED(hr))
+            {
+                Utility::PrintMessage("Could not load texture \"%ws\" (TGA: %08X).\n", filepath.generic_string().c_str(), hr);
+                return false;
+            }
+        }
+        else if (ext == L"hdr")
+        {
+            isHDR = true;
+            HRESULT hr = LoadFromHDRFile(filepath.c_str(), &info, *image);
+            if (FAILED(hr))
+            {
+                Utility::PrintMessage("Could not load texture \"%ws\" (HDR: %08X).\n", filepath.generic_string().c_str(), hr);
+                return false;
+            }
+        }
+        else
+        {
+            HRESULT hr = LoadFromWICFile(filepath.c_str(), WIC_FLAGS_NONE, &info, *image);
+            if (FAILED(hr))
+            {
+                Utility::PrintMessage("Could not load texture \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
+                return false;
+            }
+        }
+
+        if (info.width > 16384 || info.height > 16384)
+        {
+            Utility::PrintMessage("Texture size (%Iu,%Iu) too large for feature level 11.0 or later (16384) \"%ws\".\n",
+                info.width, info.height, filepath.c_str());
+            return false;
+        }
+
+        if (bFlipImage)
+        {
+            std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
+
+            HRESULT hr = FlipRotate(image->GetImages(), image->GetImageCount(), info, TEX_FR_FLIP_VERTICAL, *newImage);
+
+            if (FAILED(hr))
+            {
+                Utility::PrintMessage("Could not flip image \"%ws\" (%08X).\n", filepath.generic_string().c_str(), hr);
+                return false;
+            }
+            else
+            {
+                image.swap(newImage);
+            }
+        }
+
+        DXGI_FORMAT d3dFormat;
+        DXGI_FORMAT compressedFormat;
+        if (isHDR)
+        {
+            d3dFormat = DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
+            compressedFormat = bBlockCompress ? DXGI_FORMAT_BC6H_UF16 : DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
+        }
+        else if (bBlockCompress)
+        {
+            d3dFormat = bInterpretAsSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+            if (bContainsNormals)
+                compressedFormat = DXGI_FORMAT_BC5_UNORM;
+            else if (bUseBestBC)
+                compressedFormat = bInterpretAsSRGB ? DXGI_FORMAT_BC7_UNORM_SRGB : DXGI_FORMAT_BC7_UNORM;
+            else if (bPreserveAlpha)
+                compressedFormat = bInterpretAsSRGB ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
+            else
+                compressedFormat = bInterpretAsSRGB ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+        }
+        else
+        {
+            compressedFormat = d3dFormat = bInterpretAsSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+        }
+
+        if (info.format != d3dFormat)
+        {
+            std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
+
+            HRESULT hr = Convert(image->GetImages(), image->GetImageCount(), image->GetMetadata(),
+                d3dFormat, TEX_FILTER_DEFAULT, 0.5f, *newImage);
+
+            if (FAILED(hr))
+            {
+                Utility::PrintMessage("Could not convert \"%ws\" (%08X).\n", filepath.generic_string().c_str(), hr);
+                return false;
+            }
+            else
+            {
+                image.swap(newImage);
+                info.format = d3dFormat;
+            }
+        }
+
+        if (bGenerateMipMaps && info.mipLevels == 1)
+        {
+            std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
+
+            HRESULT hr = GenerateMipMaps(image->GetImages(), image->GetImageCount(), image->GetMetadata(), TEX_FILTER_DEFAULT, 0, *newImage);
+
+            if (FAILED(hr))
+            {
+                Utility::PrintMessage("Failing generating mimaps for \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
+                return false;
+            }
+            else
+            {
+                image.swap(newImage);
+            }
+        }
+
+        if (bBlockCompress)
+        {
+            if (info.width % 4 || info.height % 4)
+            {
+                Utility::PrintMessage("Texture size (%Iux%Iu) not a multiple of 4 \"%ws\", so skipping compress\n",
+                    info.width, info.height, filepath.generic_string().c_str());
+                return false;
+            }
+            else
+            {
+                std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
+
+                HRESULT hr = Compress(image->GetImages(), image->GetImageCount(), image->GetMetadata(),
+                    compressedFormat, TEX_COMPRESS_DEFAULT, 0.5f, *newImage);
+                if (FAILED(hr))
+                {
+                    Utility::PrintMessage("Failing compressing \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
+                    return false;
+                }
+                else
+                {
+                    image.swap(newImage);
+                }
+            }
+        }
+
+        std::filesystem::path newPath = filepath.replace_extension(L".dds");
+        HRESULT hr = SaveToDDSFile(image->GetImages(), image->GetImageCount(), image->GetMetadata(), DDS_FLAGS_NONE, newPath.c_str());
+        if (FAILED(hr))
+        {
+            ASSERT(false);
+            Utility::PrintMessage("Could not write texture to file \"%ws\" (%08X).\n", newPath.generic_string().c_str(), hr);
+            return false;
+        }
+
+        return true;
+    }
+}
+
 
 
 void Texture::Create2D(size_t rowPitchBytes, size_t width, size_t height, DXGI_FORMAT format, const void* initData)
@@ -206,27 +391,29 @@ void Texture::CreatePIXImageFromMemory(const void* memBuffer, size_t fileSize)
     Create2D(header.Pitch, header.Width, header.Height, header.Format, (uint8_t*)memBuffer + sizeof(Header));
 }
 
-bool Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags)
+void Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags)
 {
-    std::filesystem::path newPath = filepath.replace_extension(L".dds");
-    if (!std::filesystem::exists(newPath) && filepath.extension() != L".dds")
+    std::filesystem::path newPath(filepath);
+    newPath.replace_extension(L".dds");
+    if (!std::filesystem::exists(newPath))
     {
         ASSERT(ConvertToDDS(filepath, flags));
-    }
-    else
-    {
-        filepath = newPath;
     }
 
     std::shared_ptr<std::vector<D3D12_SUBRESOURCE_DATA>> subresources = std::make_shared<std::vector<D3D12_SUBRESOURCE_DATA>>();
     std::shared_ptr<std::vector<uint8_t>> ddsData = std::make_shared<std::vector<uint8_t>>();
     bool isCubeMap;
-    HRESULT hr = DirectX::LoadDDSTextureFromFile(
+    CheckHR(DirectX::LoadDDSTextureFromFile(
         Graphics::gDevice.Get(), newPath.c_str(), mResource.GetAddressOf(), *ddsData, *subresources,
-        0, nullptr, &isCubeMap);
+        0, nullptr, &isCubeMap));
+
+    D3D12_RESOURCE_DESC resDesc = mResource->GetDesc();
+    mWidth = resDesc.Width;
+    mHeight = resDesc.Height;
+    mDepth = resDesc.DepthOrArraySize;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-    srvDesc.Format = mResource->GetDesc().Format;
+    srvDesc.Format = resDesc.Format;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     if (isCubeMap)
     {
@@ -252,11 +439,8 @@ bool Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flag
             mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
         Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mDescriptorHandle);
-
         PushGraphicsTaskAsync(&Texture::InitTextureTask1, this, subresources, std::move(ddsData));
     }
-
-    return SUCCEEDED(hr);
 }
 
 void Texture::Destroy()
@@ -275,184 +459,10 @@ void Texture::Reset()
     *mVersionId = -1;
 }
 
-bool Texture::ConvertToDDS(std::filesystem::path filepath, uint16_t flags)
-{
-    using namespace DirectX;
-
-#define GetFlag(f) ((flags & f) != 0)
-    bool bInterpretAsSRGB = GetFlag(kSRGB);
-    bool bPreserveAlpha = GetFlag(kPreserveAlpha);
-    bool bContainsNormals = GetFlag(kNormalMap);
-    bool bBumpMap = GetFlag(kBumpToNormal);
-    bool bBlockCompress = GetFlag(kDefaultBC);
-    bool bUseBestBC = GetFlag(kQualityBC);
-    bool bFlipImage = GetFlag(kFlipVertical);
-    bool bGenerateMipMaps = GetFlag(kGenerateMipMaps);
-#undef GetFlag
-
-    ASSERT(!bInterpretAsSRGB || !bContainsNormals);
-    ASSERT(!bPreserveAlpha || !bContainsNormals);
-
-    std::filesystem::path ext = filepath.extension();
-    TexMetadata info;
-    std::unique_ptr<ScratchImage> image = std::make_unique<ScratchImage>();
-
-    bool isHDR = false;
-    if (ext == L"tga")
-    {
-        HRESULT hr = LoadFromTGAFile(filepath.c_str(), &info, *image);
-        if (FAILED(hr))
-        {
-            Utility::PrintMessage("Could not load texture \"%ws\" (TGA: %08X).\n", filepath.generic_string().c_str(), hr);
-            return false;
-        }
-}
-    else if (ext == L"hdr")
-    {
-        isHDR = true;
-        HRESULT hr = LoadFromHDRFile(filepath.c_str(), &info, *image);
-        if (FAILED(hr))
-        {
-            Utility::PrintMessage("Could not load texture \"%ws\" (HDR: %08X).\n", filepath.generic_string().c_str(), hr);
-            return false;
-        }
-}
-    else
-    {
-        HRESULT hr = LoadFromWICFile(filepath.c_str(), WIC_FLAGS_NONE, &info, *image);
-        if (FAILED(hr))
-        {
-            Utility::PrintMessage("Could not load texture \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
-            return false;
-        }
-    }
-
-    if (info.width > 16384 || info.height > 16384)
-    {
-        Utility::PrintMessage("Texture size (%Iu,%Iu) too large for feature level 11.0 or later (16384) \"%ws\".\n",
-            info.width, info.height, filepath.c_str());
-        return false;
-    }
-
-    if (bFlipImage)
-    {
-        std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
-
-        HRESULT hr = FlipRotate(image->GetImages(), image->GetImageCount(), info, TEX_FR_FLIP_VERTICAL, *newImage);
-
-        if (FAILED(hr))
-        {
-            Utility::PrintMessage("Could not flip image \"%ws\" (%08X).\n", filepath.generic_string().c_str(), hr);
-            return false;
-        }
-        else
-        {
-            image.swap(newImage);
-        }
-    }
-
-    DXGI_FORMAT d3dFormat;
-    DXGI_FORMAT compressedFormat;
-    if (isHDR)
-    {
-        d3dFormat = DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
-        compressedFormat = bBlockCompress ? DXGI_FORMAT_BC6H_UF16 : DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
-    }
-    else if (bBlockCompress)
-    {
-        d3dFormat = bInterpretAsSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-        if (bContainsNormals)
-            compressedFormat = DXGI_FORMAT_BC5_UNORM;
-        else if (bUseBestBC)
-            compressedFormat = bInterpretAsSRGB ? DXGI_FORMAT_BC7_UNORM_SRGB : DXGI_FORMAT_BC7_UNORM;
-        else if (bPreserveAlpha)
-            compressedFormat = bInterpretAsSRGB ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
-        else
-            compressedFormat = bInterpretAsSRGB ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
-    }
-    else
-    {
-        compressedFormat = d3dFormat = bInterpretAsSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-    }
-
-    if (info.format != d3dFormat)
-    {
-        std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
-
-        HRESULT hr = Convert(image->GetImages(), image->GetImageCount(), image->GetMetadata(), 
-            d3dFormat, TEX_FILTER_DEFAULT, 0.5f, *newImage);
-
-        if (FAILED(hr))
-        {
-            Utility::PrintMessage("Could not convert \"%ws\" (%08X).\n", filepath.generic_string().c_str(), hr);
-            return false;
-        }
-        else
-        {
-            image.swap(newImage);
-            info.format = d3dFormat;
-        }
-    }
-
-    if (bGenerateMipMaps && info.mipLevels == 1)
-    {
-        std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
-
-        HRESULT hr = GenerateMipMaps(image->GetImages(), image->GetImageCount(), image->GetMetadata(), TEX_FILTER_DEFAULT, 0, *newImage);
-
-        if (FAILED(hr))
-        {
-            Utility::PrintMessage("Failing generating mimaps for \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
-            return false;
-        }
-        else
-        {
-            image.swap(newImage);
-        }
-    }
-
-    if (bBlockCompress)
-    {
-        if (info.width % 4 || info.height % 4)
-        {
-            Utility::PrintMessage("Texture size (%Iux%Iu) not a multiple of 4 \"%ws\", so skipping compress\n", 
-                info.width, info.height, filepath.generic_string().c_str());
-            return false;
-        }
-        else
-        {
-            std::unique_ptr<ScratchImage> newImage = std::make_unique<ScratchImage>();
-
-            HRESULT hr = Compress(image->GetImages(), image->GetImageCount(), image->GetMetadata(), 
-                compressedFormat, TEX_COMPRESS_DEFAULT, 0.5f, *newImage);
-            if (FAILED(hr))
-            {
-                Utility::PrintMessage("Failing compressing \"%ws\" (WIC: %08X).\n", filepath.generic_string().c_str(), hr);
-                return false;
-            }
-            else
-            {
-                image.swap(newImage);
-            }
-        }
-    }
-
-    std::filesystem::path newPath = filepath.replace_extension(L".dds");
-    HRESULT hr = SaveToDDSFile(image->GetImages(), image->GetImageCount(), image->GetMetadata(), DDS_FLAGS_NONE, newPath.c_str());
-    if (FAILED(hr))
-    {
-        ASSERT(false);
-        Utility::PrintMessage("Could not write texture to file \"%ws\" (%08X).\n", newPath.generic_string().c_str(), hr);
-        return false;
-    }
-
-    return true;
-}
-
 CommandList* Texture::InitTextureTask(CommandList* commandList, UINT numSubresources, D3D12_SUBRESOURCE_DATA subData[])
 {
     CopyCommandList& copyList = commandList->GetCopyCommandList().Begin(L"Texture Copy" + mName);
-    copyList.InitializeTexture(*this, 1, subData);
+    copyList.InitializeTexture(*this, numSubresources, subData);
     copyList.Finish();
     return commandList;
 }
@@ -469,23 +479,38 @@ CommandList* Texture::InitTextureTask1(CommandList* commandList, std::shared_ptr
 // -- TextureRef --
 DescriptorHandle TextureRef::GetSRV() const
 {
-    if (IsValid())
-        return mRef->GetSRV();
-    return Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D).GetSRV();
+    if (mRef == nullptr || !IsValid())
+        return Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D).GetSRV();
+    return mRef->GetSRV();
 }
 
 const Texture* TextureRef::Get() const
 {
-    if (IsValid())
-        return mRef;
-    return &Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D);
+    if (mRef == nullptr || !IsValid())
+        return &Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D);
+    return mRef;
 }
 
 
 // -- TextureManager --
-static std::queue<std::future<bool>> sPrepareList;
+static std::queue<std::future<void>> sPrepareList;
+
+TextureRef TextureManager::GetTexture(const std::filesystem::path& filename)
+{
+    return GetTexture(filename, 0);
+}
+
+TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uint16_t flags)
+{
+    return GetTexture(filename, flags, Graphics::kMagenta2D);
+}
 
 TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uint16_t flags, Graphics::eDefaultTexture fallback)
+{
+    return GetTexture(filename, flags, fallback, DescriptorHandle());
+}
+
+TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uint16_t flags, Graphics::eDefaultTexture fallback, DescriptorHandle handle)
 {
     ASSERT(!std::filesystem::is_directory(filename));
 
@@ -496,10 +521,11 @@ TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uin
     std::filesystem::path realPath(mRootPath / filename);
 
     ASSERT(std::filesystem::exists(realPath));
-        //return TextureRef(Graphics::GetDefaultTexture(fallback));
+    //return TextureRef(Graphics::GetDefaultTexture(fallback));
 
     const auto& insertIter = mTextures.emplace(filename, filename.stem());
     Texture& newTexture = insertIter.first->second;
+    newTexture.mDescriptorHandle = handle;
 
     sPrepareList.emplace(Utility::gThreadPoolExecutor.Submit(&Texture::CreateFromDirectXTex, &newTexture, realPath, flags));
     return TextureRef(&newTexture);

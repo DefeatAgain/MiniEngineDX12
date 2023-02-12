@@ -27,22 +27,14 @@ namespace ModelRenderer
         kMaterialConstants,
         kGlobalConstants,
 
-        kBaseColorTextureSRV,
-        kMetallicRoughnessTextureSRV,
-        kOcclusionTextureSRV,
-        kEmissiveTextureSRV,
-        kNormalTextureSRV,
+        kModelTextures,
+        kModelTextureSamplers,
 
-        kBaseColorTextureSampler,
-        kMetallicTextureSampler,
-        kOcclusionTextureSampler,
-        kEmissiveTextureSampler,
-        kNormalTextureSampler,
-
-        kRadianceIBLTexture,
-        kIrradianceIBLTexture,
-        kPreComputeGGXBRDFTexture,
-        kTexSunShadowTexture,
+        kSceneTextures,
+        //kRadianceIBLTexture,
+        //kIrradianceIBLTexture,
+        //kPreComputeGGXBRDFTexture,
+        //kTexSunShadowTexture,
 
         kNumRootBindings
     };

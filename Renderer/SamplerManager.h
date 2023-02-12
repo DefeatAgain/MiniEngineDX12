@@ -64,8 +64,11 @@ public:
 
     DescriptorHandle GetOrCreateDescriptor(SamplerDesc samDesc);
 
+    DescriptorHandle GetOrCreateDescriptor(SamplerDesc samDesc, DescriptorHandle handle);
+
     // all DescriptorHandle invalid
     void Clear();
 };
 
 #define GET_SAM_HANDLE(samDesc) SamplerManager::GetInstance()->GetOrCreateDescriptor(samDesc)
+#define GET_SAM_HANDLED(samDesc, handle) SamplerManager::GetInstance()->GetOrCreateDescriptor(samDesc, handle)

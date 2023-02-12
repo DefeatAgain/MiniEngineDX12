@@ -57,46 +57,42 @@ void FlyingFPSCamera::Update(float deltaTime)
 
     float timeScale = Graphics::DebugZoom == 0 ? 1.0f : Graphics::DebugZoom == 1 ? 0.5f : 0.25f;
 
-    if (GameInput::IsFirstPressed(GameInput::kLThumbClick) || GameInput::IsFirstPressed(GameInput::kKey_lshift))
+    if (GameInput::IsFirstPressed(GameInput::IsFirstPressed(VK_LSHIFT)))
         m_FineMovement = !m_FineMovement;
 
-    if (GameInput::IsFirstPressed(GameInput::kRThumbClick))
-        m_FineRotation = !m_FineRotation;
+    //if (GameInput::IsFirstPressed(GameInput:: kRThumbClick))
+    //    m_FineRotation = !m_FineRotation;
 
-    float speedScale = (m_FineMovement ? 0.1f : 1.0f) * timeScale;
+    float speedScale = (m_FineMovement ? 0.1f : 1.0f) * timeScale * 0.1f;
     float panScale = (m_FineRotation ? 0.5f : 1.0f) * timeScale;
 
-    float yaw = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogRightStickX) * m_HorizontalLookSensitivity * panScale;
-    float pitch = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogRightStickY) * m_VerticalLookSensitivity * panScale;
+    //float yaw = GameInput::GetMouseInputX() * deltaTime * m_HorizontalLookSensitivity;
+    //float pitch = GameInput::GetMouseInputY() * deltaTime * m_VerticalLookSensitivity;
     float forward = m_MoveSpeed * speedScale * (
-        GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogLeftStickY) +
-        (GameInput::IsPressed(GameInput::kKey_w) ? deltaTime : 0.0f) +
-        (GameInput::IsPressed(GameInput::kKey_s) ? -deltaTime : 0.0f)
+        (GameInput::IsPressed('W') ? deltaTime : 0.0f) +
+        (GameInput::IsPressed('S') ? -deltaTime : 0.0f)
         );
     float strafe = m_StrafeSpeed * speedScale * (
-        GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogLeftStickX) +
-        (GameInput::IsPressed(GameInput::kKey_d) ? deltaTime : 0.0f) +
-        (GameInput::IsPressed(GameInput::kKey_a) ? -deltaTime : 0.0f)
+        (GameInput::IsPressed('D') ? deltaTime : 0.0f) +
+        (GameInput::IsPressed('A') ? -deltaTime : 0.0f)
         );
     float ascent = m_StrafeSpeed * speedScale * (
-        GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogRightTrigger) -
-        GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogLeftTrigger) +
-        (GameInput::IsPressed(GameInput::kKey_e) ? deltaTime : 0.0f) +
-        (GameInput::IsPressed(GameInput::kKey_q) ? -deltaTime : 0.0f)
+        (GameInput::IsPressed('E') ? deltaTime : 0.0f) +
+        (GameInput::IsPressed('Q') ? -deltaTime : 0.0f)
         );
 
     if (m_Momentum)
     {
-        ApplyMomentum(m_LastYaw, yaw, deltaTime);
-        ApplyMomentum(m_LastPitch, pitch, deltaTime);
+        //ApplyMomentum(m_LastYaw, yaw, deltaTime);
+        //ApplyMomentum(m_LastPitch, pitch, deltaTime);
         ApplyMomentum(m_LastForward, forward, deltaTime);
         ApplyMomentum(m_LastStrafe, strafe, deltaTime);
         ApplyMomentum(m_LastAscent, ascent, deltaTime);
     }
 
     // don't apply momentum to mouse inputs
-    yaw += GameInput::GetAnalogInput(GameInput::kAnalogMouseX) * m_MouseSensitivityX;
-    pitch += GameInput::GetAnalogInput(GameInput::kAnalogMouseY) * m_MouseSensitivityY;
+    float yaw = GameInput::GetMouseInputX() * deltaTime * m_MouseSensitivityX;
+    float pitch = GameInput::GetMouseInputY() * deltaTime * m_MouseSensitivityY;
 
     m_CurrentPitch += pitch;
     m_CurrentPitch = XMMin(XM_PIDIV2, m_CurrentPitch);
@@ -174,20 +170,20 @@ void OrbitCamera::Update(float deltaTime)
 
     float timeScale = Graphics::DebugZoom == 0 ? 1.0f : Graphics::DebugZoom == 1 ? 0.5f : 0.25f;
 
-    float yaw = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogLeftStickX) * timeScale * m_JoystickSensitivityX;
-    float pitch = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogLeftStickY) * timeScale * m_JoystickSensitivityY;
-    float closeness = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogRightStickY) * timeScale;
+    //float yaw = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogLeftStickX) * timeScale * m_JoystickSensitivityX;
+    //float pitch = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogLeftStickY) * timeScale * m_JoystickSensitivityY;
+    //float closeness = GameInput::GetTimeCorrectedAnalogInput(GameInput::kAnalogRightStickY) * timeScale;
 
-    if (m_Momentum)
-    {
-        ApplyMomentum(m_LastYaw, yaw, deltaTime);
-        ApplyMomentum(m_LastPitch, pitch, deltaTime);
-    }
+    //if (m_Momentum)
+    //{
+    //    ApplyMomentum(m_LastYaw, yaw, deltaTime);
+    //    ApplyMomentum(m_LastPitch, pitch, deltaTime);
+    //}
 
     // don't apply momentum to mouse inputs
-    yaw += GameInput::GetAnalogInput(GameInput::kAnalogMouseX) * m_MouseSensitivityX;
-    pitch += GameInput::GetAnalogInput(GameInput::kAnalogMouseY) * m_MouseSensitivityY;
-    closeness += GameInput::GetAnalogInput(GameInput::kAnalogMouseScroll) * 0.1f;
+    float yaw = GameInput::GetMouseInputX() * deltaTime * m_MouseSensitivityX;
+    float pitch = GameInput::GetMouseInputY() * deltaTime * m_MouseSensitivityY;
+    float closeness = GameInput::GetMouseScroll() * deltaTime * 0.1f;
 
     m_CurrentPitch += pitch;
     m_CurrentPitch = XMMin(XM_PIDIV2, m_CurrentPitch);

@@ -90,7 +90,7 @@ private:
     {}
 public:
     DescriptorHandle() :
-        mOffset(0), mOwningHeapIndex(UNKNOWN_OFFSET), mType(0)
+        mOffset(UNKNOWN_OFFSET), mOwningHeapIndex(0), mType(0)
     {}
 
     void operator+= (INT offset)
@@ -145,7 +145,7 @@ public:
 
     ID3D12DescriptorHeap* GetDescriptorHeap() const;
 
-    operator bool() const { return mOffset == UNKNOWN_OFFSET; }
+    operator bool() const { return mOffset != UNKNOWN_OFFSET; }
 
     operator D3D12_CPU_DESCRIPTOR_HANDLE()
     {
@@ -179,7 +179,7 @@ public:
 
     uint64_t GetGpuPtr() const;
 private:
-    uint64_t mOffset : 44;
+    uint64_t mOffset : 54;
     uint64_t mOwningHeapIndex : 8;
     uint64_t mType : 2;
     //DescriptorAllocator::SubHeap* mOwningHeap;

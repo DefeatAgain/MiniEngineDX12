@@ -40,6 +40,12 @@ DescriptorHandle SamplerManager::GetOrCreateDescriptor(SamplerDesc samDesc)
     return sSamplerCache.emplace(hashValue, Handle).first->second;
 }
 
+DescriptorHandle SamplerManager::GetOrCreateDescriptor(SamplerDesc samDesc, DescriptorHandle handle)
+{
+    Graphics::gDevice->CreateSampler(&samDesc, handle);
+    return handle;
+}
+
 void SamplerManager::Clear()
 {
     for (auto& kv : sSamplerCache)

@@ -7,31 +7,6 @@
 #include "Scene.h"
 #include "Model.h"
 
-void SetMaterialSRV(GraphicsCommandList& context, const Material& mat)
-{
-    if (mat.GetType() == kPBRMaterial)
-    {
-        const PBRMaterial& pbrMaterial = reinterpret_cast<const PBRMaterial&>(mat);
-#define SetSRV(srvIndex, tex) context.SetDescriptorTable(srvIndex, tex.GetSRV())
-#define SetSampler(samIndex, sam) context.SetDescriptorTable(samIndex, sam)
-        SetSRV(ModelRenderer::kBaseColorTextureSRV, pbrMaterial.mTextures[PBRMaterial::kBaseColor]);
-        SetSRV(ModelRenderer::kMetallicRoughnessTextureSRV, pbrMaterial.mTextures[PBRMaterial::kMetallicRoughness]);
-        SetSRV(ModelRenderer::kOcclusionTextureSRV, pbrMaterial.mTextures[PBRMaterial::kOcclusion]);
-        SetSRV(ModelRenderer::kEmissiveTextureSRV, pbrMaterial.mTextures[PBRMaterial::kEmissive]);
-        SetSRV(ModelRenderer::kNormalTextureSRV, pbrMaterial.mTextures[PBRMaterial::kNormal]);
-
-        SetSampler(ModelRenderer::kBaseColorTextureSampler, pbrMaterial.mSamplers[PBRMaterial::kBaseColor]);
-        SetSampler(ModelRenderer::kMetallicTextureSampler, pbrMaterial.mSamplers[PBRMaterial::kMetallicRoughness]);
-        SetSampler(ModelRenderer::kOcclusionTextureSampler, pbrMaterial.mSamplers[PBRMaterial::kOcclusion]);
-        SetSampler(ModelRenderer::kEmissiveTextureSampler, pbrMaterial.mSamplers[PBRMaterial::kEmissive]);
-        SetSampler(ModelRenderer::kNormalTextureSampler, pbrMaterial.mSamplers[PBRMaterial::kNormal]);
-#undef SetSRV
-#undef SetSampler
-        return;
-    }
-    ASSERT(false);
-}
-
 namespace ModelRenderer
 {
     std::map<size_t, uint32_t> sPSOIndices;
@@ -63,29 +38,12 @@ namespace ModelRenderer
             sForwardRootSig->GetParam(kMaterialConstants).InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_PIXEL);
             sForwardRootSig->GetParam(kGlobalConstants).InitAsConstantBuffer(1, D3D12_SHADER_VISIBILITY_ALL);
 
-#define InitTexture(SRV, Register) sForwardRootSig->GetParam(SRV).InitAsDescriptorRange( \
-            D3D12_DESCRIPTOR_RANGE_TYPE_SRV, Register, 1, D3D12_SHADER_VISIBILITY_PIXEL)
-#define InitSampler(SAMPLER, Register) sForwardRootSig->GetParam(SAMPLER).InitAsDescriptorRange( \
-            D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, Register, 1, D3D12_SHADER_VISIBILITY_PIXEL)
-
-            InitTexture(kBaseColorTextureSRV, 0);
-            InitTexture(kMetallicRoughnessTextureSRV, 1);
-            InitTexture(kOcclusionTextureSRV, 2);
-            InitTexture(kEmissiveTextureSRV, 3);
-            InitTexture(kNormalTextureSRV, 4);
-
-            InitSampler(kBaseColorTextureSampler, 0);
-            InitSampler(kMetallicTextureSampler, 1);
-            InitSampler(kOcclusionTextureSampler, 2);
-            InitSampler(kEmissiveTextureSampler, 3);
-            InitSampler(kNormalTextureSampler, 4);
-
-            InitTexture(kRadianceIBLTexture, 10);
-            InitTexture(kIrradianceIBLTexture, 11);
-            InitTexture(kPreComputeGGXBRDFTexture, 12);
-            InitTexture(kTexSunShadowTexture, 13);
-#undef InitTexture
-#undef InitSampler
+            sForwardRootSig->GetParam(kModelTextures).InitAsDescriptorRange(
+                D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 5, D3D12_SHADER_VISIBILITY_PIXEL);
+            sForwardRootSig->GetParam(kModelTextureSamplers).InitAsDescriptorRange(
+                D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 0, 5, D3D12_SHADER_VISIBILITY_PIXEL);
+            sForwardRootSig->GetParam(kSceneTextures).InitAsDescriptorRange(
+                D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 5, D3D12_SHADER_VISIBILITY_PIXEL);
             sForwardRootSig->Finalize(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
             ADD_SHADER("SkyBoxVS", L"MeshRender/SkyBoxVS.hlsl", kVS);
@@ -152,7 +110,7 @@ namespace ModelRenderer
             shadowCutOffPSO->SetRenderTargetFormats(0, nullptr, sShadowBuffer[0].GetFormat());
             shadowCutOffPSO->Finalize();
 
-            DXGI_FORMAT renderFormat = SWAP_CHAIN_FORMAT;
+            DXGI_FORMAT renderFormat = HDR_FORMAT;
             sDefaultPSO.SetRootSignature(*sForwardRootSig);
             sDefaultPSO.SetRasterizerState(Graphics::RasterizerDefault);
             sDefaultPSO.SetBlendState(Graphics::BlendDisable);
@@ -318,6 +276,8 @@ void MeshRenderer::RenderMeshes(GraphicsCommandList& context, GlobalConstants& g
     globals.CameraPos = mCamera->GetPosition();
     globals.IBLRange = mScene->GetIBLRange() - mScene->GetIBLBias();
     globals.IBLBias = mScene->GetIBLBias();
+
+    context.SetRootSignature(*ModelRenderer::sForwardRootSig);
     context.SetDynamicConstantBufferView(ModelRenderer::kGlobalConstants, sizeof(GlobalConstants), &globals);
 
     if (mBatchType == kShadows)
@@ -383,8 +343,8 @@ void MeshRenderer::RenderMeshes(GraphicsCommandList& context, GlobalConstants& g
                 const Material& material = *GET_MATERIAL(subMesh.materialIdx);
 
                 context.SetConstantBuffer(ModelRenderer::kMaterialConstants, GET_MAT_VPTR(subMesh.materialIdx));
-
-                SetMaterialSRV(context, material);
+                context.SetDescriptorTable(ModelRenderer::kModelTextures, material.GetTextureHandles());
+                context.SetDescriptorTable(ModelRenderer::kModelTextureSamplers, material.GetSamplerHandles());
 
                 if (mCurrentPass == kZPass)
                     context.SetVertexBuffer(0, { GET_MESH_DepthVB + mesh.vbDepthOffset, mesh.sizeDepthVB, subMesh.depthVertexStride });

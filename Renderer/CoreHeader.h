@@ -47,6 +47,7 @@
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "D3DCompiler.lib")
 #pragma comment(lib, "WinPixEventRuntime.lib")
+#pragma comment(lib, "user32.lib")
 
 #define D3D12_VIRTUAL_ADDRESS_NULL ((D3D12_GPU_VIRTUAL_ADDRESS)0)
 #define D3D12_DEFAULT_SAMEPLE_MASK 0xFFFFFFFF

@@ -24,6 +24,7 @@ enum eTextureFlags : uint16_t
 
 class Texture : public GpuResource, public Graphics::CopyContext
 {
+    friend class TextureManager;
 public:
     Texture(const std::wstring& name = L"Textrue") : mWidth(1), mHeight(1), mDepth(1), mName(name) {}
     Texture(DescriptorHandle handle) : mWidth(0), mHeight(0), mDepth(0), mDescriptorHandle(handle) {}
@@ -35,7 +36,7 @@ public:
     void CreateTGAFromMemory(const void* memBuffer, size_t fileSize);
     bool CreateDDSFromMemory(const void* memBuffer, size_t fileSize);
     void CreatePIXImageFromMemory(const void* memBuffer, size_t fileSize);
-    bool CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags);
+    void CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flags);
 
     virtual void Destroy() override;
     void Reset();
@@ -49,9 +50,8 @@ public:
 
     std::wstring mName;
 private:
-    bool ConvertToDDS(std::filesystem::path filepath, uint16_t flags);
-
     CommandList* InitTextureTask(CommandList* commandList, UINT numSubresources, D3D12_SUBRESOURCE_DATA subData[]);
+    // just for life cycle
     CommandList* InitTextureTask1(CommandList* commandList, std::shared_ptr<std::vector<D3D12_SUBRESOURCE_DATA>> subData,
         std::shared_ptr<std::vector<uint8_t>> initData);
 protected:
@@ -73,6 +73,8 @@ public:
     // Check that this points to a valid texture (which loaded successfully)
     bool IsValid() const { return mRef->isValid(); }
 
+    operator bool() const { return mRef != nullptr; }
+
     // Gets the SRV descriptor handle.  If the reference is invalid,
     // returns a valid descriptor handle (specified by the fallback)
     DescriptorHandle GetSRV() const;
@@ -93,7 +95,12 @@ private:
 public:
     ~TextureManager() {}
 
-    TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags = 0, Graphics::eDefaultTexture fallback = Graphics::kMagenta2D);
+    TextureRef GetTexture(const std::filesystem::path& filename);
+    TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags);
+    TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags,
+        Graphics::eDefaultTexture fallback);
+    TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags, 
+        Graphics::eDefaultTexture fallback, DescriptorHandle handle);
     
     std::filesystem::path GetAbsRootPath() const { return std::filesystem::current_path() / mRootPath; }
 private:
@@ -104,3 +111,4 @@ private:
 #define GET_TEX(filename) TextureManager::GetInstance()->GetTexture(filename)
 #define GET_TEXF(filename, flags) TextureManager::GetInstance()->GetTexture(filename, flags)
 #define GET_TEXFF(filename, flags, fallback) TextureManager::GetInstance()->GetTexture(filename, flags, fallback)
+#define GET_TEXFFD(filename, flags, fallback, handle) TextureManager::GetInstance()->GetTexture(filename, flags, fallback, handle)

@@ -1,9 +1,11 @@
 #include "ModelConverter.h"
 #include "CoreHeader.h"
+#include "Graphics.h"
 #include "glTF.h"
 #include "Material.h"
 #include "Texture.h"
 #include "SamplerManager.h"
+#include "GraphicsResource.h"
 #include "Model.h"
 #include "Mesh.h"
 #include "Scene.h"
@@ -16,7 +18,6 @@ static std::unordered_map<std::wstring, std::filesystem::path> sIBLTexturePaths;
 
 static uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
 {
-#define SetFlag(BitIdx) (1 << (BitIdx - 1))
     switch (type)
     {
     case PBRMaterial::kBaseColor:
@@ -31,7 +32,6 @@ static uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
         return kDefaultBC | kNormalMap;
     default:
         return kNoneTextureFlag;
-#undef SetFlag
     }
 }
 
@@ -69,11 +69,11 @@ static DXGI_FORMAT AccessorFormat(const glTF::Accessor& accessor)
 
 static void LoadIBLTextures()
 {
-    std::filesystem::path imagePath = L"Asset/IBLTextures";
+    std::filesystem::path imagePath = L"Asset\\IBLTextures";
     for (auto& p : std::filesystem::directory_iterator(imagePath))
     {
         std::filesystem::path filePath = p.path();
-        std::wstring filestem = filePath.stem().c_str();
+        std::wstring filestem = filePath.filename().c_str();
         size_t diffuseIdx = filestem.rfind(L"_diffuseIBL.dds");
         if (diffuseIdx != std::wstring::npos)
         {
@@ -108,7 +108,7 @@ namespace ModelConverter
     std::filesystem::path GetIBLTexture(const std::wstring& name)
     {
         auto findIter = sIBLTexturePaths.find(name);
-        ASSERT(findIter != sIBLTexturePaths.end())
+        ASSERT(findIter != sIBLTexturePaths.end());
         {
             return findIter->second;
         }
@@ -117,7 +117,7 @@ namespace ModelConverter
 
     void BuildMaterials(const glTF::Asset& asset)
 	{
-        MaterialManager* matMgr = MaterialManager::GetOrCreateInstance();
+        MaterialManager* matMgr = MaterialManager::GetInstance();
         matMgr->Reserve(asset.m_materials.size());
 
         for (uint32_t i = 0; i < asset.m_materials.size(); ++i)
@@ -159,14 +159,21 @@ namespace ModelConverter
                     texSampleDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
                 }
 
-                pbrMat.mSamplers[ti] = GET_SAM_HANDLE(texSampleDesc);
+                GET_SAM_HANDLED(texSampleDesc, pbrMat.mSamplerHandles + ti);
 
                 if (gltfMat.textures[ti] == nullptr)
+                {
+                    Graphics::gDevice->CreateShaderResourceView(Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D).GetResource(),
+                        nullptr, pbrMat.mTextureHandles + ti);
                     continue;
+                }
 
                 std::filesystem::path imagePath = asset.m_basePath / gltfMat.textures[ti]->source->path;
-                pbrMat.mTextures[ti] = GET_TEXF(imagePath, 
-                    GetTextureFlag(ti, (gltfMat.alphaBlend | gltfMat.alphaTest) && ti == PBRMaterial::kBaseColor));
+                pbrMat.mTextures[ti] = GET_TEXFFD(
+                    imagePath, 
+                    GetTextureFlag(ti, (gltfMat.alphaBlend | gltfMat.alphaTest) && ti == PBRMaterial::kBaseColor),
+                    Graphics::kWhiteOpaque2D,
+                    pbrMat.mTextureHandles + ti);
             }
         }
 
@@ -651,7 +658,7 @@ namespace ModelConverter
         for (size_t i = 0; i < numSiblings; ++i)
         {
             glTF::Node* curNode = siblings[i];
-            Model& model = sceneModels[curIndex];
+            Model& model = sceneModels[curNode->linearIdx];
             model.mHasChildren = false;
             model.mCurIndex = curNode->linearIdx;
             model.mParentIndex = curIndex;
@@ -716,6 +723,6 @@ namespace ModelConverter
 
         const glTF::Scene* gltfScene = asset.m_scene; 
         // only one scene
-        WalkGraph(scene->GetModels(), gltfScene->nodes, 0, Math::Matrix4(Math::kIdentity));
+        WalkGraph(scene->GetModels(), gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
     }
 };

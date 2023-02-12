@@ -1,6 +1,7 @@
 #include "Mesh.h"
 #include "CommandList.h"
 #include "CommandQueue.h"
+#include "FrameContext.h"
 
 enum eGpuBufferUpdateFlags
 {

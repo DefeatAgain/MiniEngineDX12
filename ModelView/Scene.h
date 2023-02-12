@@ -11,11 +11,22 @@
 class CameraController;
 class GraphicsCommandList;
 
+enum eForwardSceneTexture
+{
+    kRadianceTexture,
+    lIrradianceTexture,
+    kPreComputeBRDFTexture,
+    kShadowMap,
+    kNumTextures
+};
+
 class Scene : public Graphics::MutiGraphicsContext
 {
 public:
 	Scene() {}
-	~Scene() {}
+    ~Scene() { Destroy(); }
+
+    void Destroy();
 
     virtual void Initialize() override {}
 
@@ -25,11 +36,7 @@ public:
 
     virtual void Render() override;
 
-    void SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL)
-    {
-        mRadianceCubeMap = specularIBL;
-        mIrradianceCubeMap = diffuseIBL;
-    }
+    void SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL);
 
     void SetIBLBias(float LODBias) { mSpecularIBLBias = LODBias; }
 
@@ -68,4 +75,5 @@ private:
     TextureRef mIrradianceCubeMap;
     float mSpecularIBLRange;
     float mSpecularIBLBias;
+    DescriptorHandle mSceneTextures;
 };

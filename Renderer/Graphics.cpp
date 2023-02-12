@@ -34,9 +34,6 @@ namespace Utility
 
 namespace Graphics
 {
-#ifndef RELEASE
-    const GUID WKPDID_D3DDebugObjectName = { 0x429b8c22,0x9188,0x4b0c, { 0x87,0x42,0xac,0xb0,0xbf,0x85,0xc2,0x00 } };
-#endif
     bool DebugZoom = false;
 
     eResolution gDisplayResolution = k720p;
@@ -261,10 +258,7 @@ namespace Graphics
 
         Microsoft::WRL::ComPtr<IDXGIFactory4> dxgiFactory;
         DWORD dxgiFactoryFlags = 0;
-#ifdef _DEBUG
-        dxgiFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
-#endif
-        CheckHR(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.GetAddressOf())));
+        CheckHR(CreateDXGIFactory2(0, IID_PPV_ARGS(dxgiFactory.GetAddressOf())));
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
         swapChainDesc.Width = gDisplayWidth;
@@ -439,12 +433,10 @@ namespace Graphics
             {
                 debugInterface->EnableDebugLayer();
 
-                uint32_t useGPUBasedValidation = 0;
-                CommandLineArgs::GetInteger(L"gpu_debug", useGPUBasedValidation);
-                if (useGPUBasedValidation)
+                if (false)
                 {
                     Microsoft::WRL::ComPtr<ID3D12Debug1> debugInterface1;
-                    if (SUCCEEDED((debugInterface->QueryInterface(IID_PPV_ARGS(debugInterface1.GetAddressOf())))))
+                    if (SUCCEEDED(debugInterface->QueryInterface(IID_PPV_ARGS(debugInterface1.GetAddressOf()))))
                     {
                         debugInterface1->SetEnableGPUBasedValidation(true);
                     }
@@ -602,10 +594,13 @@ namespace Graphics
                 // This occurs when a descriptor table is unbound even when a shader does not access the missing
                 // descriptors.  This is common with a root signature shared between disparate shaders that
                 // don't all need the same types of resources.
-                //D3D12_MESSAGE_ID_COMMAND_LIST_DESCRIPTOR_TABLE_NOT_SET,
+                D3D12_MESSAGE_ID_COMMAND_LIST_DESCRIPTOR_TABLE_NOT_SET,
 
                 // RESOURCE_BARRIER_DUPLICATE_SUBRESOURCE_TRANSITIONS
                 (D3D12_MESSAGE_ID)1008,
+
+                // force copy descriptor from gpu to gpu
+                //D3D12_MESSAGE_ID_COPY_DESCRIPTORS_WRITE_ONLY_DESCRIPTOR,
             };
 
             D3D12_INFO_QUEUE_FILTER NewFilter = {};
@@ -636,7 +631,7 @@ namespace Graphics
                 };
 
                 ASSERT(SUCCEEDED(gDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &Support, sizeof(Support))) &&
-                        (Support.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD) != 0)
+                    (Support.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD) != 0);
 
                 //if (SUCCEEDED(gDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &Support, sizeof(Support))) &&
                 //    (Support.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD) != 0)

@@ -21,8 +21,6 @@ namespace GameApp
 		virtual void Update(float deltaTime);
 
 		virtual void Cleanup();
-
-		//virtual void Render();
 	};
 
 
@@ -34,8 +32,10 @@ namespace GameApp
 		ModelConverter::BuildAllMeshes(sAsset);
 		ModelConverter::BuildScene(sScenePtr, sAsset);
 
-		TextureRef radianceIBL = GET_TEX(ModelConverter::GetIBLTexture(L"CloudCommons_S"));
-		TextureRef irradianceIBL = GET_TEX(ModelConverter::GetIBLTexture(L"CloudCommons_D"));
+		sScenePtr->Startup();
+
+		TextureRef radianceIBL = GET_TEX(ModelConverter::GetIBLTexture(L"CloudCommon_S"));
+		TextureRef irradianceIBL = GET_TEX(ModelConverter::GetIBLTexture(L"CloudCommon_D"));
 		sScenePtr->SetIBLTextures(irradianceIBL, radianceIBL);
 	}
 
@@ -51,6 +51,8 @@ namespace GameApp
 
 	void SceneGameApp::Update(float deltaTime)
 	{
+		MaterialManager::GetInstance()->Update();
+
 		sScenePtr->Update(deltaTime);
 	}
 
@@ -61,11 +63,6 @@ namespace GameApp
 		MaterialManager::RemoveInstance();
 		MeshManager::RemoveInstance();
 	}
-
-	//void SceneGameApp::Render()
-	//{
-	//	sScenePtr->Render();
-	//}
 }
 
 CREATE_APPLICATION(GameApp::SceneGameApp);

@@ -44,6 +44,9 @@ public:
 
     virtual size_t GetMaterialConstantSize() const = 0;
 
+    virtual DescriptorHandle GetTextureHandles() const { return DescriptorHandle(); }
+    virtual DescriptorHandle GetSamplerHandles() const { return DescriptorHandle(); }
+
     uint16_t GetMaterialIdx() const { return mMaterialIdx; }
 
     //uint16_t GetPSOIdx() const { return mPSOIndex; }
@@ -74,15 +77,22 @@ public:
         kNumTextures 
     };
 public:
-    PBRMaterial() : Material(kPBRMaterial) {}
-    ~PBRMaterial() {}
+    PBRMaterial() : Material(kPBRMaterial) { CreateHandles(); }
+    ~PBRMaterial() { DestroyHandles(); }
+
+    virtual DescriptorHandle GetTextureHandles() const override { return mTextureHandles; }
+    virtual DescriptorHandle GetSamplerHandles() const override { return mSamplerHandles; }
 
     virtual const void* GetMaterialConstant() const override { return reinterpret_cast<const void*>(&mMaterialConstant); }
     virtual size_t GetMaterialConstantSize() const override { return sizeof(mMaterialConstant); }
+private:
+    void CreateHandles();
+    void DestroyHandles();
 public:
     PBRMaterialConstants mMaterialConstant;
     TextureRef mTextures[kNumTextures];
-    DescriptorHandle mSamplers[kNumTextures];
+    DescriptorHandle mSamplerHandles;
+    DescriptorHandle mTextureHandles;
 };
 
 
@@ -91,26 +101,11 @@ class MaterialManager : public Singleton<MaterialManager>
     USE_SINGLETON;
 private:
     MaterialManager() : mConstantBufferSize(0), mNumDirtyCount(0)
-    {
-    }
+    {}
 public:
     ~MaterialManager() {}
 
-    void Reserve(size_t size)
-    {
-        if (size <= mAllMaterials.size())
-            return;
-
-        mDirtyMaterialIndices.clear();
-        for (size_t i = 0; i < mAllMaterials.size(); i++)
-        {
-            mAllMaterials[i]->mNumDirtyCount = SWAP_CHAIN_BUFFER_COUNT;
-            mDirtyMaterialIndices.push_back(i);
-        }
-        mNumDirtyCount = SWAP_CHAIN_BUFFER_COUNT;
-
-        mAllMaterials.reserve(size);
-    }
+    void Reserve(size_t size);
 
     Material* GetMaterial(size_t index) { return mAllMaterials[index].get(); }
 
@@ -139,22 +134,7 @@ public:
         mDirtyMaterialIndices.push_back(index);
     }
 
-    void Update()
-    {
-        if (mNumDirtyCount > 0 && mConstantBufferSize > 0)
-        {
-            mGpuBuffer[CURRENT_SCENE_COLOR_BUFFER_INDEX].Create(L"Material Buffer", mConstantBufferSize * 256 * 2);
-            mNumDirtyCount--;
-        }
-
-        for (auto beg = mDirtyMaterialIndices.begin(); beg != mDirtyMaterialIndices.end();)
-        {
-            if (UpdateMaterial(*beg) == 0)
-                beg = mDirtyMaterialIndices.erase(beg);
-            else
-                beg++;
-        }
-    }
+    void Update();
 
     D3D12_GPU_VIRTUAL_ADDRESS GetGpuBufferView(size_t index) const
     {
@@ -162,16 +142,7 @@ public:
         return mGpuBuffer[CURRENT_SCENE_COLOR_BUFFER_INDEX].GetGpuVirtualAddress() + 256 * material->mBufferOffset;
     }
 private:
-    uint16_t UpdateMaterial(size_t index)
-    {
-        Material* material = mAllMaterials[index].get();
-        ASSERT(material->mNumDirtyCount > 0);
-
-        void* mappedBuffer = mGpuBuffer[CURRENT_SCENE_COLOR_BUFFER_INDEX].Map();
-        mappedBuffer = (uint8_t*)mappedBuffer + 256 * material->mBufferOffset;
-        CopyMemory(mappedBuffer, material->GetMaterialConstant(), Math::AlignUp(material->GetMaterialConstantSize(), 256));
-        return --material->mNumDirtyCount;
-    }
+    uint16_t UpdateMaterial(size_t index);
 private:
     std::vector<std::unique_ptr<Material>> mAllMaterials;       // store by index
     UploadBuffer mGpuBuffer[SWAP_CHAIN_BUFFER_COUNT];        // store frame resource index

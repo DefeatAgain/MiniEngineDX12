@@ -93,6 +93,6 @@ namespace Utility
 #else
     #define CheckHR(hr) (void)(hr)
     #define WARN_IF(isTrue, ... ) (void)(isTrue)
-    #define WARN_IF_NOT(isTrue, ... ) (void)(!isTrue)
+    #define WARN_IF_NOT(isTrue, ... ) (void)(!(isTrue))
     #define ASSERT(isFalse, ... ) (void)(isFalse)
 #endif // _DEBUG

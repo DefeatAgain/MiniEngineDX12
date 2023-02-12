@@ -33,16 +33,16 @@ namespace GameApp
 
         Graphics::Initialize(game.RequiresRaytracingSupport());
         SystemTime::Initialize();
-        GameInput::Initialize();
 
         InitSingleton();
 
         Graphics::InitializeSwapChain(); // need commandQueue
 
-        // TextContext As built-in context
-        REGISTER_CONTEXT(PostEffect, Graphics::gRenderWidth, Graphics::gRenderHeight);
-        TextRenderer::gTextContext = REGISTER_CONTEXT(TextContext, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
         game.RegisterContext();
+
+        REGISTER_CONTEXT(PostEffect, Graphics::gRenderWidth, Graphics::gRenderHeight);
+        // TextContext As built-in context
+        TextRenderer::gTextContext = REGISTER_CONTEXT(TextContext, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
 
         Graphics::InitializeResource();
 
@@ -55,8 +55,6 @@ namespace GameApp
 
         game.Cleanup();
 
-        GameInput::Shutdown();
-
         Graphics::DestroyResource();
 
         DestroySingleton();
@@ -66,12 +64,12 @@ namespace GameApp
     {
         ZoneScoped;
 
-        float DeltaTime = Graphics::GetFrameTime();
+        float deltaTime = Graphics::GetFrameTime();
 
         CommandQueueManager::GetInstance()->SelectQueueEvent();
 
-        GameInput::Update(DeltaTime);
-        game.Update(DeltaTime);
+        game.Update(deltaTime);
+        GameInput::Update(deltaTime);
 
         DrawUI();
 
@@ -93,6 +91,9 @@ namespace GameApp
         if (!XMVerifyCPUSupport())
             return 1;
 
+        //if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+        //    ASSERT(LoadLibrary(L"WinPixGpuCapturer.dll"));
+
         Microsoft::WRL::Wrappers::RoInitializeWrapper InitializeWinRT(RO_INIT_MULTITHREADED);
         CheckHR(InitializeWinRT);
 
@@ -100,7 +101,7 @@ namespace GameApp
         WNDCLASSEX wcex;
         wcex.cbSize = sizeof(WNDCLASSEX);
         wcex.style = CS_HREDRAW | CS_VREDRAW;
-        wcex.lpfnWndProc = WndProc;
+        wcex.lpfnWndProc = GameInput::WndProc;
         wcex.cbClsExtra = 0;
         wcex.cbWndExtra = 0;
         wcex.hInstance = hInst;
@@ -115,8 +116,6 @@ namespace GameApp
         // Create window
         Graphics::ResolutionToUINT(Graphics::gDisplayResolution, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
 
-        std::filesystem::current_path(std::filesystem::current_path() / L"..\\");
-
         RECT rc = { 0, 0, (LONG)Graphics::gDisplayWidth, (LONG)Graphics::gDisplayHeight };
         AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
@@ -125,27 +124,29 @@ namespace GameApp
 
         ASSERT(Graphics::ghWnd != 0);
 
+        std::filesystem::current_path(std::filesystem::current_path() / L"..\\");
         InitializeApplication(*gameApp);
 
         ShowWindow(Graphics::ghWnd, nCmdShow/*SW_SHOWDEFAULT*/);
 
-        do
+        while (true)
         {
             MSG msg = {};
-            bool done = false;
-            while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+            if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
             {
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
                 if (msg.message == WM_QUIT)
-                    done = true;
+                    break;
             }
-
-            if (done)
-                break;
-        } while (UpdateApplication(*gameApp));	// Returns false to quit loop
-
+            else
+            {
+                if (!UpdateApplication(*gameApp))
+                    break;
+            }
+        }
+           
         TerminateApplication(*gameApp);
         Graphics::Shutdown();
         return 0;
@@ -175,25 +176,6 @@ namespace GameApp
         DescriptorAllocatorManager::RemoveInstance();
     }
 
-    LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-    {
-        switch (message)
-        {
-        case WM_SIZE:
-            Graphics::ResizeSwapChain((UINT)(UINT64)lParam & 0xFFFF, (UINT)(UINT64)lParam >> 16);
-            break;
-
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            break;
-
-        default:
-            return DefWindowProc(hWnd, message, wParam, lParam);
-        }
-
-        return 0;
-    }
-
     void DrawUI()
     {
         ZoneScoped;
@@ -204,6 +186,6 @@ namespace GameApp
 
     bool IGameApp::IsDone()
     {
-        return GameInput::IsFirstPressed(GameInput::kKey_escape);
+        return GameInput::IsFirstPressed(VK_ESCAPE);
     }
 }

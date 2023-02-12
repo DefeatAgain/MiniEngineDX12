@@ -127,7 +127,7 @@ void GraphicsPipelineState::Finalize()
 		CheckHR(Graphics::gDevice->CreateGraphicsPipelineState(&mPipelineStateDesc, IID_PPV_ARGS(mPipelineState.GetAddressOf())));
 		mPipelineState->SetName(mName.c_str());
 	};
-	if (sIsFirstInitPipeStatMgr)
+	if (!sIsFirstInitPipeStatMgr)
 		sInitPipeStatTasks.emplace(Utility::gThreadPoolExecutor.Submit(initTask));
 	else
 		initTask();
@@ -155,7 +155,7 @@ void ComputePipelineState::Finalize()
 		CheckHR(Graphics::gDevice->CreateComputePipelineState(&mPipelineStateDesc, IID_PPV_ARGS(mPipelineState.GetAddressOf())));
 		mPipelineState->SetName(mName.c_str());
 	};
-	if (sIsFirstInitPipeStatMgr)
+	if (!sIsFirstInitPipeStatMgr)
 		sInitPipeStatTasks.emplace(Utility::gThreadPoolExecutor.Submit(initTask));
 	else
 		initTask();
