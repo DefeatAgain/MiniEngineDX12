@@ -17,7 +17,7 @@ void Model::Render(MeshRenderer& sorter, const Math::AffineTransform& transform,
             sphereWS.GetRadius() * transform.GetUniformScale());
         Math::BoundingSphere sphereVS = Math::BoundingSphere(viewMat * sphereWS.GetCenter(), sphereWS.GetRadius());
 
-        //if (frustum.IntersectSphere(sphereVS))
+        if (frustum.IntersectSphere(sphereVS))
         {
             float distance = -sphereVS.GetCenter().GetZ() - sphereVS.GetRadius();
             sorter.AddMesh(mesh, this, distance, meshCBV);

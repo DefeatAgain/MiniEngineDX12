@@ -19,7 +19,7 @@ namespace ModelRenderer
     {
         for (size_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
         {
-            sShadowBuffer[i].Create(L"Shadow Map", 2048, 2048);
+            sShadowBuffer[i].Create(L"Shadow Map", 2048, 2048, DXGI_FORMAT_D32_FLOAT);
         }
 
         Graphics::AddRSSTask([]()
@@ -71,7 +71,7 @@ namespace ModelRenderer
             sAllPSOs.push_back(depthOnlyCutOffPSO);
             sAllPSOs.push_back(shadowPSO);
             sAllPSOs.push_back(shadowCutOffPSO);
-            sAllPSOs.push_back(sSkyboxPSO);
+            //sAllPSOs.push_back(sSkyboxPSO);
 
             D3D12_INPUT_ELEMENT_DESC posOnly[] =
             {
@@ -133,7 +133,7 @@ namespace ModelRenderer
     {
         for (size_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
         {
-            sShadowBuffer[0].Destroy();
+            sShadowBuffer[i].Destroy();
         }
     }
 
@@ -204,7 +204,7 @@ namespace ModelRenderer
 
     ShadowBuffer& GetCurrentShadowBuffer()
     {
-        return sShadowBuffer[CURRENT_SCENE_COLOR_BUFFER_INDEX];
+        return sShadowBuffer[CURRENT_FARME_BUFFER_INDEX];
     }
 }
 

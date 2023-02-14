@@ -11,15 +11,6 @@
 class CameraController;
 class GraphicsCommandList;
 
-enum eForwardSceneTexture
-{
-    kRadianceTexture,
-    lIrradianceTexture,
-    kPreComputeBRDFTexture,
-    kShadowMap,
-    kNumTextures
-};
-
 class Scene : public Graphics::MutiGraphicsContext
 {
 public:
@@ -52,6 +43,8 @@ public:
 
     void UpdateModels();
 private:
+    void MapLinearDescriptors();
+
     void UpdateModelBoundingSphere();
 
     CommandList* RenderScene(CommandList* context);
@@ -75,5 +68,6 @@ private:
     TextureRef mIrradianceCubeMap;
     float mSpecularIBLRange;
     float mSpecularIBLBias;
-    DescriptorHandle mSceneTextures;
+
+    DescriptorLinearAlloc mSceneTexturesAlloc;
 };

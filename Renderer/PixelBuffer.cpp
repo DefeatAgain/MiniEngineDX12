@@ -710,9 +710,9 @@ void DepthBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t numMips)
 
 
 // -- ShadowBuffer --
-void ShadowBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height)
+void ShadowBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, DXGI_FORMAT dsvFormat)
 {
-    DepthBuffer::Create(name, width, height, 1, DXGI_FORMAT_D16_UNORM);
+    DepthBuffer::Create(name, width, height, 1, dsvFormat);
 
     mViewport.TopLeftX = 0.0f;
     mViewport.TopLeftY = 0.0f;

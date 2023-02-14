@@ -9,8 +9,6 @@
 
 void Scene::Destroy()
 {
-    if (mSceneTextures)
-        DEALLOC_DESCRIPTOR(mSceneTextures, eForwardSceneTexture::kNumTextures);
 }
 
 void Scene::Startup()
@@ -19,16 +17,14 @@ void Scene::Startup()
     mSceneCamera.SetZRange(1.0f, 10000.0f);
     mDirtyModels = true;
 
-    mCameraController.reset(new FlyingFPSCamera(mSceneCamera, Vector3(kYUnitVector)));
-    mMeshConstantsUploader.Create(L"Mesh Constants Buffer", Math::AlignUp(sizeof(ModelConstants), 256) * mModelTransform.size());
-
-    mSceneTextures = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, eForwardSceneTexture::kNumTextures);
-
-    UpdateModels();
-
     mSunDirectionTheta = 0.75f;
     mSunDirectionPhi = -0.5f;
     mSunLightIntensity = Vector3(1, 1, 1);
+
+    mCameraController.reset(new FlyingFPSCamera(mSceneCamera, Vector3(kYUnitVector)));
+    mMeshConstantsUploader.Create(L"Mesh Constants Buffer", Math::AlignUp(sizeof(ModelConstants), 256) * mModelTransform.size());
+
+    UpdateModels();
 }
 
 CommandList* Scene::RenderScene(CommandList* context)
@@ -44,7 +40,6 @@ CommandList* Scene::RenderScene(CommandList* context)
 
     Vector3 SunDirection = Normalize(Vector3(costheta * cosphi, sinphi, sintheta * cosphi));
     Vector3 ShadowBounds = Vector3(mSceneBoundingSphere.GetRadius());
-    //m_SunShadowCamera.UpdateMatrix(-SunDirection, m_ModelInst.GetCenter(), ShadowBounds,
     mShadowCamera.UpdateMatrix(-SunDirection, Vector3(0, -500.0f, 0), Vector3(5000, 3000, 3000));
 
     GlobalConstants globals;
@@ -58,50 +53,50 @@ CommandList* Scene::RenderScene(CommandList* context)
     ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     ghContext.ClearDepth(depthBuffer);
 
-    MeshRenderer meshRenderer(MeshRenderer::kDefault);
-    meshRenderer.SetCamera(mSceneCamera);
-    meshRenderer.SetScene(*this);
-    meshRenderer.SetViewport(Graphics::GetDefaultViewPort());
-    meshRenderer.SetScissor(Graphics::GetDefaultScissor());
-    meshRenderer.SetDepthStencilTarget(depthBuffer);
-    meshRenderer.AddRenderTarget(colorBuffer);
+    //MeshRenderer meshRenderer(MeshRenderer::kDefault);
+    //meshRenderer.SetCamera(mSceneCamera);
+    //meshRenderer.SetScene(*this);
+    //meshRenderer.SetViewport(Graphics::GetDefaultViewPort());
+    //meshRenderer.SetScissor(Graphics::GetDefaultScissor());
+    //meshRenderer.SetDepthStencilTarget(depthBuffer);
+    //meshRenderer.AddRenderTarget(colorBuffer);
 
-    for (size_t i = 0; i < mModels.size(); i++)
-    {
-        mModels[i].Render(meshRenderer, mModelTransform[i], 
-            mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
-    }
+    //for (size_t i = 0; i < mModels.size(); i++)
+    //{
+    //    mModels[i].Render(meshRenderer, mModelTransform[i], 
+    //        mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
+    //}
 
-    meshRenderer.Sort();
-    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
+    //meshRenderer.Sort();
+    //meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
 
-    MeshRenderer shadowRenderer(MeshRenderer::kShadows);
-    ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
-    shadowRenderer.SetScene(*this);
-    shadowRenderer.SetCamera(mShadowCamera);
-    shadowRenderer.SetDepthStencilTarget(shadowBuffer);
+    //MeshRenderer shadowRenderer(MeshRenderer::kShadows);
+    //ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
+    //shadowRenderer.SetScene(*this);
+    //shadowRenderer.SetCamera(mShadowCamera);
+    //shadowRenderer.SetDepthStencilTarget(shadowBuffer);
 
-    for (size_t i = 0; i < mModels.size(); i++)
-    {
-        mModels[i].Render(shadowRenderer, mModelTransform[i], 
-            mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
-    }
+    //for (size_t i = 0; i < mModels.size(); i++)
+    //{
+    //    mModels[i].Render(shadowRenderer, mModelTransform[i], 
+    //        mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
+    //}
 
-    shadowRenderer.Sort();
-    shadowRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
+    //shadowRenderer.Sort();
+    //shadowRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
 
-    ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    ghContext.ClearColor(colorBuffer);
+    //ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    //ghContext.ClearColor(colorBuffer);
 
     //context->TransitionResource(g_SSAOFullScreen, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-    ghContext.SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
-    ghContext.SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
-    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kOpaque);
+    //ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    //ghContext.SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
+    //ghContext.SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
+    //meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kOpaque);
 
     RenderSkyBox(ghContext);
 
-    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kTransparent);
+    //meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kTransparent);
 
     ghContext.Finish();
     return context;
@@ -125,18 +120,19 @@ void Scene::RenderSkyBox(GraphicsCommandList& ghContext)
 
     DepthBuffer& depthBuffer = CURRENT_SCENE_DEPTH_BUFFER;
     ColorBuffer& colorBuffer = CURRENT_SCENE_COLOR_BUFFER;
-    //context->SetRootSignature(m_RootSig);
+    ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
+
     ghContext.SetPipelineState(*ModelRenderer::sSkyboxPSO);
 
     ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-    ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
     ghContext.SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
     ghContext.SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
 
-    //context->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_TextureHeap.GetHeapPointer());
     ghContext.SetDynamicConstantBufferView(ModelRenderer::kMeshConstants, sizeof(SkyboxVSCB), &skyVSCB);
     ghContext.SetDynamicConstantBufferView(ModelRenderer::kMaterialConstants, sizeof(SkyboxPSCB), &skyPSCB);
-    ghContext.SetDescriptorTable(ModelRenderer::kSceneTextures, mSceneTextures);
+    ghContext.SetDescriptorTable(ModelRenderer::kSceneTextures, mSceneTexturesAlloc.GetStart());
+    ghContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ghContext.Draw(3);
 }
 
@@ -161,11 +157,9 @@ void Scene::SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL)
 
     if (!diffuseIBL.IsValid())
         const_cast<Texture*>(diffuseIBL.Get())->ForceWaitContext();
-    Graphics::gDevice->CreateShaderResourceView(const_cast<Texture*>(diffuseIBL.Get())->GetResource(), nullptr, mSceneTextures);
 
     if (!specularIBL.IsValid())
         const_cast<Texture*>(specularIBL.Get())->ForceWaitContext();
-    Graphics::gDevice->CreateShaderResourceView(const_cast<Texture*>(specularIBL.Get())->GetResource(), nullptr, mSceneTextures + 1);
 }
 
 void Scene::UpdateModels()
@@ -205,6 +199,19 @@ void Scene::UpdateModels()
     UpdateModelBoundingSphere();
 
     mDirtyModels = false;
+}
+
+void Scene::MapLinearDescriptors()
+{
+    ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
+
+    std::vector<DescriptorHandle> allHandles;
+    allHandles.push_back(mRadianceCubeMap.GetSRV());
+    allHandles.push_back(mIrradianceCubeMap.GetSRV());
+    allHandles.emplace_back();
+    allHandles.push_back(shadowBuffer.GetSRV());
+
+
 }
 
 void Scene::UpdateModelBoundingSphere()

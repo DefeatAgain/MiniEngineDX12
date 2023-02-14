@@ -134,12 +134,12 @@ public:
     void Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t numSamples, uint32_t numMips, DXGI_FORMAT format);
 
     // Get pre-created CPU-visible descriptor handles
-    const DescriptorHandle& GetDSV() const { return mDSV; }
-    const DescriptorHandle GetDSV_DepthReadOnly() const { return mDSV + 1; }
-    const DescriptorHandle GetDSV_StencilReadOnly() const { ASSERT(mHasStencilView); return mDSV + 2; }
-    const DescriptorHandle GetDSV_ReadOnly() const { ASSERT(mHasStencilView); return mDSV + 3; }
-    const DescriptorHandle& GetDepthSRV() const { return mDepthSRV; }
-    const DescriptorHandle& GetStencilSRV() const { return mStencilSRV; }
+    DescriptorHandle GetDSV() const { return mDSV; }
+    DescriptorHandle GetDSV_DepthReadOnly() const { return mDSV + 1; }
+    DescriptorHandle GetDSV_StencilReadOnly() const { ASSERT(mHasStencilView); return mDSV + 2; }
+    DescriptorHandle GetDSV_ReadOnly() const { ASSERT(mHasStencilView); return mDSV + 3; }
+    DescriptorHandle GetDepthSRV() const { return mDepthSRV; }
+    DescriptorHandle GetStencilSRV() const { return mStencilSRV; }
 
     float GetClearDepth() const { return mClearDepth; }
     uint8_t GetClearStencil() const { return mClearStencil; }
@@ -160,9 +160,9 @@ class ShadowBuffer : public DepthBuffer
 public:
     ShadowBuffer() {}
 
-    void Create(const std::wstring& name, uint32_t width, uint32_t height);
+    void Create(const std::wstring& name, uint32_t width, uint32_t height, DXGI_FORMAT dsvFormat = DSV_FORMAT);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE GetSRV() const { return GetDepthSRV(); }
+    DescriptorHandle GetSRV() const { return GetDepthSRV(); }
 
     void BeginRendering(GraphicsCommandList& commandList);
     void EndRendering(GraphicsCommandList& commandList);

@@ -182,7 +182,6 @@ private:
     uint64_t mOffset : 54;
     uint64_t mOwningHeapIndex : 8;
     uint64_t mType : 2;
-    //DescriptorAllocator::SubHeap* mOwningHeap;
 };
 
 
@@ -225,3 +224,22 @@ private:
 #define ALLOC_DESCRIPTOR(type, count) DescriptorAllocatorManager::GetInstance()->AllocateDescriptor(type, count)
 #define ALLOC_DESCRIPTOR1(type) ALLOC_DESCRIPTOR(type, 1)
 #define DEALLOC_DESCRIPTOR(handle, count) DescriptorAllocatorManager::GetInstance()->DeAllocateDescriptor(handle, count)
+
+
+// LinearAllocForGpu
+class DescriptorLinearAlloc
+{
+public:
+    DescriptorLinearAlloc(D3D12_DESCRIPTOR_HEAP_TYPE type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, size_t size = 64);
+    ~DescriptorLinearAlloc() {}
+
+    D3D12_GPU_DESCRIPTOR_HANDLE Map(DescriptorHandle handle, size_t index,  size_t size);
+    //D3D12_GPU_DESCRIPTOR_HANDLE Map(DescriptorHandle handles[], size_t size);
+
+    D3D12_GPU_DESCRIPTOR_HANDLE GetStart() const { return mGpuStart; }
+private:
+    D3D12_DESCRIPTOR_HEAP_TYPE mType;
+    D3D12_CPU_DESCRIPTOR_HANDLE mCpuStart;
+    D3D12_GPU_DESCRIPTOR_HANDLE mGpuStart;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
+};

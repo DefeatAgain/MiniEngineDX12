@@ -139,7 +139,7 @@ public:
     D3D12_GPU_VIRTUAL_ADDRESS GetGpuBufferView(size_t index) const
     {
         Material* material = mAllMaterials[index].get();
-        return mGpuBuffer[CURRENT_SCENE_COLOR_BUFFER_INDEX].GetGpuVirtualAddress() + 256 * material->mBufferOffset;
+        return mGpuBuffer[CURRENT_FARME_BUFFER_INDEX].GetGpuVirtualAddress() + 256 * material->mBufferOffset;
     }
 private:
     uint16_t UpdateMaterial(size_t index);

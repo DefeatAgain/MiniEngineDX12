@@ -131,10 +131,11 @@ uint8_t DescriptorAllocator::AllocNewHeap()
     desc.Type = mType;
     desc.NumDescriptors = MAX_DESCRIPTOR_HEAP_SIZE;
     desc.NodeMask = 0;
-    if (mType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || mType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)
-        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    else
-        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    //if (mType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || mType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)
+    //    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    //else
+    //    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
     SubHeap* subAllocator = mDescriptorHeapPool.emplace_back(new SubHeap(*this));
     CheckHR(Graphics::gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(subAllocator->mDescriptorHeap.GetAddressOf())));
@@ -230,3 +231,88 @@ uint64_t DescriptorHandle::GetGpuPtr() const
     DescriptorAllocator& alloc = GET_DESCRIPTOR_ALLOC(GetType());
     return alloc.GetHeapGpuStart(mOwningHeapIndex).ptr + (mOffset * alloc.mDescriptorSize);
 }
+
+DescriptorLinearAlloc::DescriptorLinearAlloc(D3D12_DESCRIPTOR_HEAP_TYPE type, size_t size)
+{
+    ASSERT(type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    mType = type;
+
+    D3D12_DESCRIPTOR_HEAP_DESC desc;
+    desc.Type = mType;
+    desc.NumDescriptors = size;
+    desc.NodeMask = 0;
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    CheckHR(Graphics::gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(mDescriptorHeap.GetAddressOf())));
+    mCpuStart = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    mGpuStart = mDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+    mCurrentDescriptorOffset = 0;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorLinearAlloc::Map(DescriptorHandle handle, size_t index, size_t size)
+{
+    ASSERT(index + size < 64);
+
+    const D3D12_CPU_DESCRIPTOR_HANDLE& cpuHandle = handle;
+
+    auto findIter = mAddrMap.find(cpuHandle.ptr);
+    if (findIter != mAddrMap.end())
+    {
+        D3D12_GPU_DESCRIPTOR_HANDLE res;
+        res.ptr = findIter->second;
+        return res;
+    }
+    else
+    {
+        D3D12_DESCRIPTOR_HEAP_TYPE heapType = handle.GetType();
+        size_t descriptorSize = Graphics::gDevice->GetDescriptorHandleIncrementSize(heapType);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE curCpuHandle(mCpuStart);
+        CD3DX12_GPU_DESCRIPTOR_HANDLE curGpuHandle(mGpuStart);
+        curCpuHandle.Offset(index, descriptorSize);
+        curGpuHandle.Offset(index, descriptorSize);
+
+        for (size_t i = 0; i < size; i++)
+        {
+            const D3D12_CPU_DESCRIPTOR_HANDLE& cpuHandle1 = handle[i];
+            Graphics::gDevice->CopyDescriptorsSimple(1, curCpuHandle, cpuHandle1, heapType);
+            curCpuHandle.Offset(1, descriptorSize);
+        }
+
+        return curGpuHandle;
+    }
+}
+
+//D3D12_GPU_DESCRIPTOR_HANDLE DescriptorLinearAlloc::Map(DescriptorHandle handles[], size_t size)
+//{
+//    const D3D12_CPU_DESCRIPTOR_HANDLE& cpuHandle = handles[0];
+//
+//    auto findIter = mAddrMap.find(cpuHandle.ptr);
+//    if (findIter != mAddrMap.end())
+//    {
+//        D3D12_GPU_DESCRIPTOR_HANDLE res;
+//        res.ptr = findIter->second;
+//        return res;
+//    }
+//    else
+//    {
+//        ASSERT(size + mCurrentDescriptorOffset < 64);
+//
+//        D3D12_DESCRIPTOR_HEAP_TYPE heapType = handles[0].GetType();
+//        size_t descriptorSize = Graphics::gDevice->GetDescriptorHandleIncrementSize(heapType);
+//        CD3DX12_CPU_DESCRIPTOR_HANDLE curCpuHandle(mCpuStart);
+//        CD3DX12_GPU_DESCRIPTOR_HANDLE curGpuHandle(mGpuStart);
+//        curCpuHandle.Offset(mCurrentDescriptorOffset, descriptorSize);
+//        curGpuHandle.Offset(mCurrentDescriptorOffset, descriptorSize);
+//        mAddrMap[curCpuHandle.ptr] = curGpuHandle.ptr;
+//
+//        for (size_t i = 0; i < size; i++)
+//        {
+//            const D3D12_CPU_DESCRIPTOR_HANDLE& cpuHandle1 = handles[0];
+//            Graphics::gDevice->CopyDescriptorsSimple(1, curCpuHandle, cpuHandle1, heapType);
+//            curCpuHandle.Offset(1, descriptorSize);
+//        }
+//
+//        mCurrentDescriptorOffset += size;
+//        return curGpuHandle;
+//    }
+//}

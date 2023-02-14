@@ -187,7 +187,6 @@ void FrameContext::PrepareRevealBufferBegin(GraphicsCommandList& ghCommandList)
 {
 	ColorBuffer& swapChain = FrameContextManager::GetInstance()->GetCurrentSwapChain();
 	ghCommandList.TransitionResource(swapChain, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-	//ghCommandList.ClearColor(swapChain);
 
 	ColorBuffer& sceneBuffer = FrameContextManager::GetInstance()->GetCurrentSceneColorBuffer();
 	ghCommandList.TransitionResource(sceneBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
@@ -281,6 +280,8 @@ void FrameContextManager::OnResizeSceneBuffer(uint32_t width, uint32_t height)
 
 void FrameContextManager::OnResizeSwapChain(uint32_t width, uint32_t height)
 {
+	mCurFrameContextIdx = 0;
+
 	for (auto& renderContext : mGraphicsContexts)
 		renderContext.second->OnResizeSwapChain(width, height);
 }

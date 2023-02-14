@@ -115,6 +115,7 @@ namespace GameApp
 
         // Create window
         Graphics::ResolutionToUINT(Graphics::gDisplayResolution, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
+        Graphics::ResolutionToUINT(Graphics::gRenderResolution, Graphics::gRenderWidth, Graphics::gRenderHeight);
 
         RECT rc = { 0, 0, (LONG)Graphics::gDisplayWidth, (LONG)Graphics::gDisplayHeight };
         AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);

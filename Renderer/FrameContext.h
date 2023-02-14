@@ -125,6 +125,6 @@ private:
 #define CURRENT_SWAP_CHAIN FrameContextManager::GetInstance()->GetCurrentSwapChain()
 #define CURRENT_SCENE_COLOR_BUFFER FrameContextManager::GetInstance()->GetCurrentSceneColorBuffer()
 #define CURRENT_SCENE_DEPTH_BUFFER FrameContextManager::GetInstance()->GetCurrentSceneDepthBuffer()
-#define CURRENT_SCENE_COLOR_BUFFER_INDEX FrameContextManager::GetInstance()->GetCurFrameContextIdx()
+#define CURRENT_FARME_BUFFER_INDEX FrameContextManager::GetInstance()->GetCurFrameContextIdx()
 #define REGISTER_CONTEXT(Renderable, ...) FrameContextManager::GetInstance()->RegisterContext<Renderable>(__VA_ARGS__);
 #define PUSH_MUTIRENDER_TASK(...) FrameContextManager::GetInstance()->PushMutiGraphicsTask(__VA_ARGS__);
