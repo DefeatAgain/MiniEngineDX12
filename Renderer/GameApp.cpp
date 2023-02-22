@@ -91,8 +91,10 @@ namespace GameApp
         if (!XMVerifyCPUSupport())
             return 1;
 
-        //if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
-        //    ASSERT(LoadLibrary(L"WinPixGpuCapturer.dll"));
+//#ifdef _DEBUG
+//        if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+//            ASSERT(LoadLibrary(L"WinPixGpuCapturer.dll"));
+//#endif
 
         Microsoft::WRL::Wrappers::RoInitializeWrapper InitializeWinRT(RO_INIT_MULTITHREADED);
         CheckHR(InitializeWinRT);

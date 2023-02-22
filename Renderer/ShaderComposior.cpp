@@ -8,7 +8,7 @@ namespace
 	using TaskType = std::future<void>;
 	std::queue<TaskType> mTaskQueue;
 	std::mutex sTaskMutex;
-	bool sShaderCompositorInited = false;
+	bool sShaderCompositorInited = true;
 }
 
 
@@ -70,7 +70,7 @@ const ShaderUnit& ShaderCompositor::AddShader(const std::string& shaderName,
 	eShaderType type,
 	const std::vector<const char*>& defaultDefines)
 {
-	ASSERT(!sShaderCompositorInited);
+	WARN_IF_NOT(sShaderCompositorInited, L"Async Load Shader is False!");
 
 	std::filesystem::path realPath(GetFinalRootPath() / filename);
 	ASSERT(std::filesystem::exists(realPath));

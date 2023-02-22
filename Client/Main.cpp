@@ -34,8 +34,8 @@ namespace GameApp
 
 		sScenePtr->Startup();
 
-		TextureRef radianceIBL = GET_TEX(ModelConverter::GetIBLTexture(L"CloudCommon_S"));
-		TextureRef irradianceIBL = GET_TEX(ModelConverter::GetIBLTexture(L"CloudCommon_D"));
+		TextureRef radianceIBL = GET_TEX(ModelConverter::GetIBLTextureFilename(L"CloudCommon_S"));
+		TextureRef irradianceIBL = GET_TEX(ModelConverter::GetIBLTextureFilename(L"CloudCommon_D"));
 		sScenePtr->SetIBLTextures(irradianceIBL, radianceIBL);
 	}
 

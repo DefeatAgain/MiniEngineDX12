@@ -122,6 +122,19 @@ namespace Graphics
         virtual void RegisterFecneEvent(const std::function<void(uint64_t)>& callback) override;
     };
 
+    class AsyncGraphicsContext : public AsyncContext
+    {
+    protected:
+        AsyncGraphicsContext() {}
+        ~AsyncGraphicsContext() {}
+
+        virtual void WaitAsyncFence() override;
+
+        virtual void CommitGraphicsTask(const GraphicsTask& graphicsTask) override;
+        virtual void CommitGraphicsTaskWithCallback(const GraphicsTask& graphicsTask, const std::function<void(uint64_t)>& callback) override;
+        virtual void RegisterFecneEvent(const std::function<void(uint64_t)>& callback) override;
+    };
+
 
     class MutiGraphicsContext : public GraphicsContext
     {

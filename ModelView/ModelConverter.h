@@ -14,7 +14,7 @@ class Scene;
 */
 namespace ModelConverter
 {
-	std::filesystem::path GetIBLTexture(const std::wstring& name);
+	std::filesystem::path GetIBLTextureFilename(const std::wstring& name);
 
 	void BuildMaterials(const glTF::Asset& asset);
 

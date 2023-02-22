@@ -34,6 +34,8 @@ namespace Graphics
     ColorBuffer& GetSwapChainBuffer(size_t i);
     ColorBuffer& GetSceneColorBuffer(size_t i);
     DepthBuffer& GetSceneDepthBuffer(size_t i);
+    DescriptorHandle GetSceneColorBufferSRV(uint32_t i);
+    DescriptorHandle GetSceneDepthBufferSRV(uint32_t i);
 
     D3D12_VIEWPORT GetDefaultViewPort();
     D3D12_RECT GetDefaultScissor();

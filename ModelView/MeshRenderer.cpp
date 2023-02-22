@@ -81,7 +81,7 @@ namespace ModelRenderer
             D3D12_INPUT_ELEMENT_DESC posAndUV[] =
             {
                 { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-                { "TEXCOORD", 0, DXGI_FORMAT_R8G8_UNORM,         0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+                { "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             };
 
             depthOnlyPSO->SetRootSignature(*sForwardRootSig);
@@ -114,7 +114,7 @@ namespace ModelRenderer
             sDefaultPSO.SetRootSignature(*sForwardRootSig);
             sDefaultPSO.SetRasterizerState(Graphics::RasterizerDefault);
             sDefaultPSO.SetBlendState(Graphics::BlendDisable);
-            sDefaultPSO.SetDepthStencilState(Graphics::DepthStateReadWrite);
+            sDefaultPSO.SetDepthStencilState(Graphics::DepthStateTestEqual);
             sDefaultPSO.SetInputLayout(0, nullptr);
             sDefaultPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
             sDefaultPSO.SetRenderTargetFormats(1, &renderFormat, DSV_FORMAT);
@@ -157,10 +157,10 @@ namespace ModelRenderer
         vertexLayout.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT });
         vertexLayout.push_back({ "NORMAL",   0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, D3D12_APPEND_ALIGNED_ELEMENT });
         vertexLayout.push_back({ "TANGENT",  0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, D3D12_APPEND_ALIGNED_ELEMENT });
-        vertexLayout.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R8G8_UNORM,       0, D3D12_APPEND_ALIGNED_ELEMENT });
+        vertexLayout.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT });
 
         if (psoFlags & kHasUV1)
-            vertexLayout.push_back({ "TEXCOORD", 1, DXGI_FORMAT_R8G8_UNORM,       0, D3D12_APPEND_ALIGNED_ELEMENT });
+            vertexLayout.push_back({ "TEXCOORD", 1, DXGI_FORMAT_R16G16_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT });
         
         colorPSO->SetInputLayout((uint32_t)vertexLayout.size(), vertexLayout.data());
         if (psoFlags & kHasUV1)
@@ -213,8 +213,8 @@ void MeshRenderer::AddMesh(const SubMesh& subMesh, const Model* model, float dis
     SortKey key;
     key.value = mSortObjects.size();
 
-    bool alphaBlend = (subMesh.psoFlags & ePSOFlags::kAlphaBlend) == ePSOFlags::kAlphaBlend;
-    bool alphaTest = (subMesh.psoFlags & ePSOFlags::kAlphaTest) == ePSOFlags::kAlphaTest;
+    bool alphaBlend = subMesh.psoFlags & ePSOFlags::kAlphaBlend;
+    bool alphaTest = subMesh.psoFlags & ePSOFlags::kAlphaTest;
 
     union float_or_int { float f; uint32_t u; } dist;
     dist.f = Math::Max(distance, 0.0f);
@@ -343,13 +343,14 @@ void MeshRenderer::RenderMeshes(GraphicsCommandList& context, GlobalConstants& g
                 const Material& material = *GET_MATERIAL(subMesh.materialIdx);
 
                 context.SetConstantBuffer(ModelRenderer::kMaterialConstants, GET_MAT_VPTR(subMesh.materialIdx));
-                context.SetDescriptorTable(ModelRenderer::kModelTextures, material.GetTextureHandles());
-                context.SetDescriptorTable(ModelRenderer::kModelTextureSamplers, material.GetSamplerHandles());
+                context.SetDescriptorTable(ModelRenderer::kModelTextures, material.GetTextureGpuHandles());
+                context.SetDescriptorTable(ModelRenderer::kModelTextureSamplers, material.GetSamplerGpuHandles());
+                context.SetDescriptorTable(ModelRenderer::kSceneTextures, mScene->GetSceneTextureHandles());
 
                 if (mCurrentPass == kZPass)
-                    context.SetVertexBuffer(0, { GET_MESH_DepthVB + mesh.vbDepthOffset, mesh.sizeDepthVB, subMesh.depthVertexStride });
+                    context.SetVertexBuffer(0, { GET_MESH_DepthVB + mesh.vbDepthOffset, mesh.sizeDepthVB, mesh.depthVertexStride });
                 else
-                    context.SetVertexBuffer(0, { GET_MESH_VB + mesh.vbOffset, mesh.sizeVB, subMesh.vertexStride });
+                    context.SetVertexBuffer(0, { GET_MESH_VB + mesh.vbOffset, mesh.sizeVB, mesh.vertexStride });
 
                 DXGI_FORMAT indexFormat = subMesh.index32 ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
                 context.SetIndexBuffer({ GET_MESH_IB + mesh.ibOffset, mesh.sizeIB, indexFormat });

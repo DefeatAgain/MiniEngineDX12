@@ -243,10 +243,8 @@ void Texture::Create2D(size_t rowPitchBytes, size_t width, size_t height, DXGI_F
     Graphics::gDevice->CreateShaderResourceView(mResource.Get(), nullptr, mDescriptorHandle);
 
     PushGraphicsTaskSync(&Texture::InitTextureTask, this, 1, &texResource);
-    //if (waitFinished)
-    //    PushGraphicsTaskSync(&Texture::InitTextureTask, this, 1, &texResource);
-    //else
-    //    PushGraphicsTaskAsync(&Texture::InitTextureTask1, this, 1, &texResource, std::shared_ptr<const void>(initData));
+
+    mIsLoaded = true;
 }
 
 void Texture::CreateCube(size_t rowPitchBytes, size_t width, size_t height, DXGI_FORMAT format, const void* initialData)
@@ -288,11 +286,6 @@ void Texture::CreateCube(size_t rowPitchBytes, size_t width, size_t height, DXGI
     texResource.RowPitch = rowPitchBytes;
     texResource.SlicePitch = rowPitchBytes * height;
 
-    //if (waitFinished)
-    //    PushGraphicsTaskSync(&Texture::InitTextureTask, this, 1, &texResource);
-    //else
-    //    PushGraphicsTaskAsync(&Texture::InitTextureTask1, this, 1, &texResource, std::shared_ptr<const void>(initialData));
-
     if (!mDescriptorHandle)
         mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -306,6 +299,8 @@ void Texture::CreateCube(size_t rowPitchBytes, size_t width, size_t height, DXGI
     Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mDescriptorHandle);
 
     PushGraphicsTaskSync(&Texture::InitTextureTask, this, 1, &texResource);
+
+    mIsLoaded = true;
 }
 
 //void Texture::CreateTGAFromMemory(const void* memBuffer, size_t fileSize)
@@ -408,15 +403,13 @@ void Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flag
         0, nullptr, &isCubeMap));
 
     D3D12_RESOURCE_DESC resDesc = mResource->GetDesc();
-    mWidth = resDesc.Width;
-    mHeight = resDesc.Height;
-    mDepth = resDesc.DepthOrArraySize;
-
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = resDesc.Format;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     if (isCubeMap)
     {
+        mfallback = Graphics::kBlackCubeMap;
+
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
         srvDesc.TextureCube.MipLevels = -1;
         srvDesc.TextureCube.MostDetailedMip = 0;
@@ -431,13 +424,19 @@ void Texture::CreateFromDirectXTex(std::filesystem::path filepath, uint16_t flag
         srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
     }
 
+    mIsLoaded = true;
+
     {
         static std::mutex sMutex;
         std::lock_guard<std::mutex> lockGuard(sMutex);
 
-        if (!mDescriptorHandle)
-            mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        mWidth = resDesc.Width;
+        mHeight = resDesc.Height;
+        mDepth = resDesc.DepthOrArraySize;
 
+        if (mDescriptorHandle.IsNull())
+            mDescriptorHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            
         Graphics::gDevice->CreateShaderResourceView(mResource.Get(), &srvDesc, mDescriptorHandle);
         PushGraphicsTaskAsync(&Texture::InitTextureTask1, this, subresources, std::move(ddsData));
     }
@@ -461,9 +460,10 @@ void Texture::Reset()
 
 CommandList* Texture::InitTextureTask(CommandList* commandList, UINT numSubresources, D3D12_SUBRESOURCE_DATA subData[])
 {
-    CopyCommandList& copyList = commandList->GetCopyCommandList().Begin(L"Texture Copy" + mName);
-    copyList.InitializeTexture(*this, numSubresources, subData);
-    copyList.Finish();
+    GraphicsCommandList& ghList = commandList->GetGraphicsCommandList().Begin(L"Texture Copy" + mName);
+    ghList.InitializeTexture(*this, numSubresources, subData);
+    ghList.TransitionResource(*this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    ghList.Finish();
     return commandList;
 }
 
@@ -479,15 +479,19 @@ CommandList* Texture::InitTextureTask1(CommandList* commandList, std::shared_ptr
 // -- TextureRef --
 DescriptorHandle TextureRef::GetSRV() const
 {
-    if (mRef == nullptr || !IsValid())
+    if (mRef == nullptr)
         return Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D).GetSRV();
+    else if(!IsValid())
+        return Graphics::GetDefaultTexture(mRef->GetFallback()).GetSRV();
     return mRef->GetSRV();
 }
 
 const Texture* TextureRef::Get() const
 {
-    if (mRef == nullptr || !IsValid())
+    if (mRef == nullptr)
         return &Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D);
+    else if (!IsValid())
+        return &Graphics::GetDefaultTexture(mRef->GetFallback());
     return mRef;
 }
 
@@ -507,11 +511,6 @@ TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uin
 
 TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uint16_t flags, Graphics::eDefaultTexture fallback)
 {
-    return GetTexture(filename, flags, fallback, DescriptorHandle());
-}
-
-TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uint16_t flags, Graphics::eDefaultTexture fallback, DescriptorHandle handle)
-{
     ASSERT(!std::filesystem::is_directory(filename));
 
     auto iter = mTextures.find(filename);
@@ -525,8 +524,28 @@ TextureRef TextureManager::GetTexture(const std::filesystem::path& filename, uin
 
     const auto& insertIter = mTextures.emplace(filename, filename.stem());
     Texture& newTexture = insertIter.first->second;
-    newTexture.mDescriptorHandle = handle;
 
-    sPrepareList.emplace(Utility::gThreadPoolExecutor.Submit(&Texture::CreateFromDirectXTex, &newTexture, realPath, flags));
+    mTextureTasks[filename] = std::move(sPrepareList.emplace(
+        Utility::gThreadPoolExecutor.Submit(&Texture::CreateFromDirectXTex, &newTexture, realPath, flags)));
     return TextureRef(&newTexture);
+}
+
+bool TextureManager::WaitLoading()
+{
+    for (auto& kv : mTextureTasks)
+        kv.second.get();
+    mTextureTasks.clear();
+    return false;
+}
+
+bool TextureManager::WaitLoading(const std::filesystem::path& filename)
+{
+    auto iter = mTextureTasks.find(filename);
+    if (iter == mTextureTasks.end())
+        return false;
+
+    iter->second.get();
+
+    mTextureTasks.erase(iter);
+    return true;
 }

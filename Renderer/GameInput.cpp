@@ -6,9 +6,9 @@
 
 namespace
 {
-     uint8_t sMouseButtonDown = 0;
-     uint64_t sKeyboardHold[256] = { 0 };
-     std::bitset<512> sKeyboardDown;
+    uint8_t sMouseButtonDown = 0;
+    uint64_t sKeyboardHold[256] = { 0 };
+    std::bitset<512> sKeyboardDown;
 
     POINT sLastMousePos;
     POINT sMouseMoveDelta;
@@ -71,6 +71,7 @@ LRESULT CALLBACK GameInput::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
     case WM_KEYDOWN:
     {
         ASSERT(wParam > 0);
+        //Utility::PrintMessage("%d", wParam);
         if (sKeyboardDown.test(wParam))
             sKeyboardDown.set(wParam + 256);
         else
@@ -105,7 +106,6 @@ bool GameInput::IsAnyPressed()
 
 bool GameInput::IsPressed(int di)
 {
-    //Utility::PrintMessage("%d", (bool)sKeyboardDown[di]);
     return sKeyboardDown[di];
 }
 

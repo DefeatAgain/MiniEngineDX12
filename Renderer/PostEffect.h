@@ -14,7 +14,7 @@ public:
 
     virtual void Initialize() override;
 
-    virtual void Update(float deltaTime) {}
+    virtual void Update(float deltaTime);
 
     virtual void BeginRender() {}
     virtual void Render() override;
@@ -24,5 +24,7 @@ public:
 
     //virtual void OnResizeSwapChain(uint32_t width, uint32_t height) {}
     virtual void OnResizeSceneBuffer(uint32_t width, uint32_t height) override;
+private:
+    DescriptorHandle mTextureGpuHandles;
 };
 

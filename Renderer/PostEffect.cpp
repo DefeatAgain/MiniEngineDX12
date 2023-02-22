@@ -94,6 +94,15 @@ void PostEffect::Initialize()
     PostEffectRender::Initialize();
 }
 
+void PostEffect::Update(float deltaTime)
+{
+    //if (!mTextureGpuHandles)
+    //{
+    //    mTextureGpuHandles = ALLOC_DESCRIPTOR_GPU(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+
+    //}
+}
+
 void PostEffect::Render()
 {
     PUSH_MUTIRENDER_TASK({ D3D12_COMMAND_LIST_TYPE_DIRECT, PushGraphicsTaskBind(&PostEffect::RenderTaskToneMapping, this) });
@@ -114,7 +123,7 @@ CommandList* PostEffect::RenderTaskToneMapping(CommandList* commandList)
         ghCommandList.SetPipelineState(*sScaleAndCompositeSDRPS);
         ghCommandList.SetConstants(1, 0.7071f / Graphics::gRenderWidth, 0.7071f / Graphics::gRenderHeight);
     }
-    ghCommandList.SetDescriptorTable(0, CURRENT_SCENE_COLOR_BUFFER.GetSRV());
+    ghCommandList.SetDescriptorTable(0, CURRENT_SCENE_COLOR_BUFFERSRV);
     ghCommandList.ExceptResourceBeginState(CURRENT_SCENE_COLOR_BUFFER, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     ghCommandList.SetViewportAndScissor(0, 0, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
     ghCommandList.SetRenderTarget(CURRENT_SWAP_CHAIN.GetRTV());

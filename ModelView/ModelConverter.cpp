@@ -101,11 +101,13 @@ struct GeometryData
     uint32_t depthVertexBufferSize;
     uint32_t indexBufferSize;
     uint32_t vertexCount;
+    uint8_t vertexStride;
+    uint8_t depthVertexStride;
 };
 
 namespace ModelConverter
 {
-    std::filesystem::path GetIBLTexture(const std::wstring& name)
+    std::filesystem::path GetIBLTextureFilename(const std::wstring& name)
     {
         auto findIter = sIBLTexturePaths.find(name);
         ASSERT(findIter != sIBLTexturePaths.end());
@@ -159,17 +161,13 @@ namespace ModelConverter
                     texSampleDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
                 }
 
-                GET_SAM_HANDLED(texSampleDesc, pbrMat.mSamplerHandles + ti);
+                pbrMat.mSamplerHandles[ti] = GET_SAM_HANDLE(texSampleDesc);
 
                 if (gltfMat.textures[ti] == nullptr)
-                {
-                    Graphics::gDevice->CreateShaderResourceView(Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D).GetResource(),
-                        nullptr, pbrMat.mTextureHandles + ti);
                     continue;
-                }
 
                 std::filesystem::path imagePath = asset.m_basePath / gltfMat.textures[ti]->source->path;
-                pbrMat.mTextures[ti] = GET_TEXFFD(
+                pbrMat.mTextures[ti] = GET_TEXFF(
                     imagePath, 
                     GetTextureFlag(ti, (gltfMat.alphaBlend | gltfMat.alphaTest) && ti == PBRMaterial::kBaseColor),
                     Graphics::kWhiteOpaque2D,
@@ -177,10 +175,12 @@ namespace ModelConverter
             }
         }
 
+        TextureManager::GetInstance()->WaitLoading();
+
         LoadIBLTextures();
 	}
 
-    GeometryData BuildSubMesh(const glTF::Primitive& primitive, SubMesh& subMesh)
+    GeometryData BuildSubMesh(const glTF::Primitive& primitive, SubMesh& subMesh, const ePSOFlags meshPsoFlags)
     {
         ASSERT(primitive.attributes[glTF::Primitive::kPosition] != nullptr, "Must have POSITION");
         GeometryData geoData;
@@ -406,34 +406,34 @@ namespace ModelConverter
         }
 
         // Use VBWriter to generate a new, interleaved and compressed vertex buffer
-        std::vector<D3D12_INPUT_ELEMENT_DESC> OutputElements;
+        std::vector<D3D12_INPUT_ELEMENT_DESC> outputElements;
 
         subMesh.psoFlags = ePSOFlags::kHasPosition | ePSOFlags::kHasNormal;
-        OutputElements.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
-        OutputElements.push_back({ "NORMAL", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        outputElements.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        outputElements.push_back({ "NORMAL", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
         if (tangent.get())
         {
-            OutputElements.push_back({ "TANGENT", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+            outputElements.push_back({ "TANGENT", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
             subMesh.psoFlags |= ePSOFlags::kHasTangent;
         }
-        if (texcoords[0].get())
+        if (texcoords[0].get() || meshPsoFlags & ePSOFlags::kHasUV0)
         {
-            OutputElements.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+            outputElements.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
             subMesh.psoFlags |= ePSOFlags::kHasUV0;
         }
-        if (texcoords[1].get())
+        if (texcoords[1].get() || meshPsoFlags & ePSOFlags::kHasUV1)
         {
-            OutputElements.push_back({ "TEXCOORD", 1, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+            outputElements.push_back({ "TEXCOORD", 1, DXGI_FORMAT_R16G16_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
             subMesh.psoFlags |= ePSOFlags::kHasUV1;
         }
         //if (texcoords[2].get())
         //{
-        //    OutputElements.push_back({ "TEXCOORD", 2, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        //    outputElements.push_back({ "TEXCOORD", 2, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
         //    subMesh.psoFlags |= ePSOFlags::kHasUV2;
         //}
         //if (texcoords[3].get())
         //{
-        //    OutputElements.push_back({ "TEXCOORD", 3, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        //    outputElements.push_back({ "TEXCOORD", 3, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
         //    subMesh.psoFlags |= ePSOFlags::kHasUV3;
         //}
         if (primitive.material->alphaBlend)
@@ -443,7 +443,7 @@ namespace ModelConverter
         if (primitive.material->twoSided)
             subMesh.psoFlags |= ePSOFlags::kTwoSided;
 
-        D3D12_INPUT_LAYOUT_DESC layout = { OutputElements.data(), (uint32_t)OutputElements.size() };
+        D3D12_INPUT_LAYOUT_DESC layout = { outputElements.data(), (uint32_t)outputElements.size() };
 
         VBWriter vbw;
         vbw.Initialize(layout);
@@ -462,25 +462,26 @@ namespace ModelConverter
         if (tangent.get())
             CheckHR(vbw.Write(tangent.get(), "TANGENT", 0, vertexCount, true));
         if (texcoords[0].get())
-            CheckHR(vbw.Write(texcoords[0].get(), "TEXCOORD", 0, vertexCount, true));
+            CheckHR(vbw.Write(texcoords[0].get(), "TEXCOORD", 0, vertexCount));
         if (texcoords[1].get())
-            CheckHR(vbw.Write(texcoords[1].get(), "TEXCOORD", 1, vertexCount, true));
+            CheckHR(vbw.Write(texcoords[1].get(), "TEXCOORD", 1, vertexCount));
         //if (texcoords[2].get())
         //    CheckHR(vbw.Write(texcoords[2].get(), "TEXCOORD", 2, vertexCount));
         //if (texcoords[3].get())
         //    CheckHR(vbw.Write(texcoords[3].get(), "TEXCOORD", 3, vertexCount));
 
         // Now write a VB for positions only (or positions and UV when alpha testing)
-        std::vector<D3D12_INPUT_ELEMENT_DESC> DepthElements;
-        DepthElements.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
-        if (primitive.material->alphaTest)
+        std::vector<D3D12_INPUT_ELEMENT_DESC> depthElements;
+        depthElements.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        if (primitive.material->alphaTest || meshPsoFlags & ePSOFlags::kAlphaTest)
         {
-            DepthElements.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R8G8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+            depthElements.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
         }
-        D3D12_INPUT_LAYOUT_DESC depthLayout = { OutputElements.data(), (uint32_t)OutputElements.size() };
+        D3D12_INPUT_LAYOUT_DESC depthLayout = { depthElements.data(), (uint32_t)depthElements.size() };
 
         VBWriter dvbw;
         dvbw.Initialize(depthLayout);
+        MemoryBarrier;
         ComputeInputLayout(depthLayout, offsets, strides);
         uint32_t depthStride = strides[0];
 
@@ -489,15 +490,15 @@ namespace ModelConverter
         CheckHR(dvbw.AddStream(geoData.depthVB.get(), vertexCount, 0, depthStride));
 
         dvbw.Write(position.get(), "POSITION", 0, vertexCount);
-        if (primitive.material->alphaTest && texcoords[primitive.material->baseColorUV])
+        if (primitive.material->alphaTest && texcoords[0])
         {
-            dvbw.Write(texcoords[primitive.material->baseColorUV].get(), "TEXCOORD", 0, vertexCount);
+            dvbw.Write(texcoords[0].get(), "TEXCOORD", 0, vertexCount);
         }
 
         ASSERT(primitive.material->index < 0x8000, "Only 15-bit material indices allowed");
         ASSERT(stride <= 0xFF && depthStride <= 0xFF);
-        subMesh.vertexStride = (uint8_t)stride;
-        subMesh.depthVertexStride = (uint8_t)depthStride;
+        geoData.vertexStride = (uint8_t)stride;
+        geoData.depthVertexStride = (uint8_t)depthStride;
         subMesh.index32 = b32BitIndices;
         subMesh.materialIdx = primitive.material->index;
         subMesh.indexCount = indexCount;
@@ -582,9 +583,29 @@ namespace ModelConverter
         Math::AxisAlignedBox boundingBox(kZero);
         Math::BoundingSphere boundingSphere(kZero);
         std::vector<GeometryData> allGeoData;
+
+        // preprocess mesh flags, each mesh has same vertex layout
+        uint32_t meshflags = (ePSOFlags::kHasNormal | ePSOFlags::kHasPosition);
         for (size_t pi = 0; pi < gltfMesh.primitives.size(); pi++)
         {
-            GeometryData& geoData = allGeoData.emplace_back(BuildSubMesh(gltfMesh.primitives[pi], mesh.subMeshes[pi]));
+            const bool hasUV0 = gltfMesh.primitives[pi].attributes[glTF::Primitive::kTexcoord0] != nullptr;
+            const bool hasUV1 = gltfMesh.primitives[pi].attributes[glTF::Primitive::kTexcoord1] != nullptr;
+            const bool alphaTest = gltfMesh.primitives[pi].material->alphaTest;
+            meshflags |= hasUV0 ? ePSOFlags::kHasUV0 : 0;
+            meshflags |= hasUV1 ? ePSOFlags::kHasUV1 : 0;
+            meshflags |= alphaTest ? ePSOFlags::kAlphaTest : 0;
+        }
+
+        for (size_t pi = 0; pi < gltfMesh.primitives.size(); pi++)
+        {
+            GeometryData& geoData = allGeoData.emplace_back(BuildSubMesh(
+                gltfMesh.primitives[pi], mesh.subMeshes[pi], (ePSOFlags) meshflags));
+
+            Utility::PrintMessage("%d %d", mesh.depthVertexStride, geoData.depthVertexStride);
+            ASSERT(mesh.vertexStride == 0 || mesh.vertexStride == geoData.vertexStride);
+            ASSERT(mesh.depthVertexStride == 0 || mesh.depthVertexStride == geoData.depthVertexStride);
+            mesh.vertexStride = geoData.vertexStride;
+            mesh.depthVertexStride = geoData.depthVertexStride;
 
             SubMesh& submesh = mesh.subMeshes[pi];
             submesh.baseVertex = baseVertex;

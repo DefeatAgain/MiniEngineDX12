@@ -51,4 +51,29 @@ namespace Graphics
 		CommandQueue& queue = CommandQueueManager::GetInstance()->GetComputeQueue();
 		CommandQueueManager::GetInstance()->GetComputeQueue().RegisterQueueEvent(*mContextFence, callback);
 	}
+
+
+	// -- AsyncGraphicsContext --
+	void AsyncGraphicsContext::WaitAsyncFence()
+	{
+		CommandQueue& queue = CommandQueueManager::GetInstance()->GetGraphicsQueue();
+		queue.WaitForFence(*mContextFence);
+	}
+
+	void AsyncGraphicsContext::CommitGraphicsTask(const GraphicsTask& graphicsTask)
+	{
+		*mContextFence = FrameContextManager::GetInstance()->CommitAsyncGraphicsTask(graphicsTask);
+	}
+
+	void AsyncGraphicsContext::CommitGraphicsTaskWithCallback(const GraphicsTask& graphicsTask, const std::function<void(uint64_t)>& callback)
+	{
+		*mContextFence = FrameContextManager::GetInstance()->CommitAsyncGraphicsTask(graphicsTask);
+		RegisterFecneEvent(callback);
+	}
+
+	void AsyncGraphicsContext::RegisterFecneEvent(const std::function<void(uint64_t)>& callback)
+	{
+		CommandQueue& queue = CommandQueueManager::GetInstance()->GetGraphicsQueue();
+		CommandQueueManager::GetInstance()->GetGraphicsQueue().RegisterQueueEvent(*mContextFence, callback);
+	}
 }

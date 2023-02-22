@@ -24,9 +24,7 @@ struct SubMesh
             uint32_t materialIdx : 15;  // mesh
         };
     };
-    uint8_t vertexStride;
-    uint8_t depthVertexStride;
-    uint16_t uniqueMaterialIdx;
+    uint32_t uniqueMaterialIdx;
 };
 
 
@@ -49,7 +47,9 @@ struct Mesh
     uint32_t vbDepthOffset; // BufferLocation - Buffer.GpuVirtualAddress
     uint32_t ibOffset;      // BufferLocation - Buffer.GpuVirtualAddress
     uint32_t meshIndex;
-    uint32_t subMeshCount;
+    uint16_t subMeshCount;
+    uint8_t vertexStride;
+    uint8_t depthVertexStride;
 };
 
 class MeshManager : public Singleton<MeshManager>, public Graphics::CopyContext

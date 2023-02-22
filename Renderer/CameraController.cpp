@@ -57,7 +57,7 @@ void FlyingFPSCamera::Update(float deltaTime)
 
     float timeScale = Graphics::DebugZoom == 0 ? 1.0f : Graphics::DebugZoom == 1 ? 0.5f : 0.25f;
 
-    if (GameInput::IsFirstPressed(GameInput::IsFirstPressed(VK_LSHIFT)))
+    if (GameInput::IsFirstPressed(VK_SHIFT))
         m_FineMovement = !m_FineMovement;
 
     //if (GameInput::IsFirstPressed(GameInput:: kRThumbClick))

@@ -539,309 +539,6 @@ void CopyCommandList::ReadbackTexture(ReadbackBuffer& dstBuffer, PixelBuffer& sr
 }
 
 
-// -- GraphicsCommandList --
-void GraphicsCommandList::ClearUAV(GpuBuffer& target)
-{
-    FlushResourceBarriers();
-
-    const UINT clearColor[4] = {};
-    mCommandList->ClearUnorderedAccessViewUint(target.GetUAV(), target.GetUAV(), target.GetResource(), clearColor, 0, nullptr);
-}
-
-void GraphicsCommandList::ClearUAV(ColorBuffer& target)
-{
-    FlushResourceBarriers();
-
-    CD3DX12_RECT clearRect(0, 0, (LONG)target.GetWidth(), (LONG)target.GetHeight());
-    const float* clearColor = target.GetClearColor().GetPtr();
-    mCommandList->ClearUnorderedAccessViewFloat(target.GetUAV(), target.GetUAV(), target.GetResource(), clearColor, 1, &clearRect);
-}
-
-void GraphicsCommandList::ClearColor(ColorBuffer& target, D3D12_RECT* rect)
-{
-    FlushResourceBarriers();
-    mCommandList->ClearRenderTargetView(target.GetRTV(), target.GetClearColor().GetPtr(), (rect == nullptr) ? 0 : 1, rect);
-}
-
-void GraphicsCommandList::ClearColor(ColorBuffer& target, float color[4], D3D12_RECT* rect)
-{
-    FlushResourceBarriers();
-    mCommandList->ClearRenderTargetView(target.GetRTV(), color, (rect == nullptr) ? 0 : 1, rect);
-}
-
-void GraphicsCommandList::ClearDepth(DepthBuffer& target)
-{
-    FlushResourceBarriers();
-    mCommandList->ClearDepthStencilView(
-        target.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
-}
-
-void GraphicsCommandList::ClearStencil(DepthBuffer& target)
-{
-    FlushResourceBarriers();
-    mCommandList->ClearDepthStencilView(
-        target.GetDSV(), D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
-}
-
-void GraphicsCommandList::ClearDepthAndStencil(DepthBuffer& target)
-{
-    FlushResourceBarriers();
-    mCommandList->ClearDepthStencilView(
-        target.GetDSV(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
-}
-
-void GraphicsCommandList::BeginQuery(ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT heapIndex)
-{
-    mCommandList->BeginQuery(queryHeap, type, heapIndex);
-}
-
-void GraphicsCommandList::EndQuery(ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT heapIndex)
-{
-    mCommandList->EndQuery(queryHeap, type, heapIndex);
-}
-
-void GraphicsCommandList::ResolveQueryData(
-    ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT startIndex, UINT numQueries, ID3D12Resource* destinationBuffer, UINT64 destinationBufferOffset)
-{
-    mCommandList->ResolveQueryData(queryHeap, type, startIndex, numQueries, destinationBuffer, destinationBufferOffset);
-}
-
-void GraphicsCommandList::SetRenderTargets(UINT numRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE rtvs[])
-{
-    mCommandList->OMSetRenderTargets(numRTVs, rtvs, FALSE, nullptr);
-}
-
-void GraphicsCommandList::SetRenderTargets(UINT numRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE rtvs[], D3D12_CPU_DESCRIPTOR_HANDLE dsv)
-{
-    mCommandList->OMSetRenderTargets(numRTVs, rtvs, FALSE, &dsv);
-}
-
-void GraphicsCommandList::SetViewport(const D3D12_VIEWPORT& vp)
-{
-    mCommandList->RSSetViewports(1, &vp);
-}
-
-void GraphicsCommandList::SetViewport(FLOAT x, FLOAT y, FLOAT w, FLOAT h, FLOAT minDepth, FLOAT maxDepth)
-{
-    D3D12_VIEWPORT vp;
-    vp.Width = w;
-    vp.Height = h;
-    vp.MinDepth = minDepth;
-    vp.MaxDepth = maxDepth;
-    vp.TopLeftX = x;
-    vp.TopLeftY = y;
-    mCommandList->RSSetViewports(1, &vp);
-}
-
-void GraphicsCommandList::SetScissor(const D3D12_RECT& rect)
-{
-    ASSERT(rect.left < rect.right && rect.top < rect.bottom);
-    mCommandList->RSSetScissorRects(1, &rect);
-}
-
-void GraphicsCommandList::SetScissor(UINT left, UINT top, UINT right, UINT bottom)
-{
-    SetScissor(CD3DX12_RECT(left, top, right, bottom));
-}
-
-void GraphicsCommandList::SetViewportAndScissor(const D3D12_VIEWPORT& vp, const D3D12_RECT& rect)
-{
-    SetViewport(vp);
-    SetScissor(rect);
-}
-
-void GraphicsCommandList::SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h)
-{
-    SetViewport((float)x, (float)y, (float)w, (float)h);
-    SetScissor(x, y, x + w, y + h);
-}
-
-void GraphicsCommandList::SetStencilRef(UINT stencilRef)
-{
-    mCommandList->OMSetStencilRef(stencilRef);
-}
-
-void GraphicsCommandList::SetBlendFactor(Color blendFactor)
-{
-    mCommandList->OMSetBlendFactor(blendFactor.GetPtr());
-}
-
-void GraphicsCommandList::SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology)
-{
-    mCommandList->IASetPrimitiveTopology(topology);
-}
-
-void GraphicsCommandList::SetConstantArray(UINT rootIndex, UINT numConstants, const void* pConstants)
-{
-    mCommandList->SetGraphicsRoot32BitConstants(rootIndex, numConstants, pConstants, 0);
-}
-
-void GraphicsCommandList::SetConstant(UINT rootIndex, UINT offset, DWParam val)
-{
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, val.Uint, offset);
-}
-
-void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x)
-{
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
-}
-
-void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x, DWParam y)
-{
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
-}
-
-void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z)
-{
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, z.Uint, 2);
-}
-
-void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z, DWParam w)
-{
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, z.Uint, 2);
-    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, w.Uint, 3);
-}
-
-void GraphicsCommandList::SetConstantBuffer(UINT rootIndex, D3D12_GPU_VIRTUAL_ADDRESS cbv)
-{
-    mCommandList->SetGraphicsRootConstantBufferView(rootIndex, cbv);
-}
-
-void GraphicsCommandList::SetDynamicConstantBufferView(UINT rootIndex, size_t bufferSize, const void* bufferData)
-{
-    ASSERT(bufferData);
-    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize, 256);
-    CopyMemory(span.mCpuAddress, bufferData, bufferSize);
-    mCommandList->SetGraphicsRootConstantBufferView(rootIndex, span.mGpuAddress);
-}
-
-void GraphicsCommandList::SetBufferSRV(UINT rootIndex, const GpuBuffer& srv, UINT64 offset)
-{
-    D3D12_RESOURCE_STATES usageState = GetResourceStateCache(const_cast<GpuBuffer&>(srv)).mStateCurrent;
-    ASSERT((usageState & (D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)) != 0);
-    mCommandList->SetGraphicsRootShaderResourceView(rootIndex, srv.GetGpuVirtualAddress() + offset);
-}
-
-void GraphicsCommandList::SetBufferUAV(UINT rootIndex, const GpuBuffer& uav, UINT64 offset)
-{
-    D3D12_RESOURCE_STATES usageState = GetResourceStateCache(const_cast<GpuBuffer&>(uav)).mStateCurrent;
-    ASSERT((usageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS) != 0);
-    mCommandList->SetGraphicsRootUnorderedAccessView(rootIndex, uav.GetGpuVirtualAddress() + offset);
-}
-
-void GraphicsCommandList::SetRootSignature(const RootSignature& rootSig)
-{
-    if (rootSig.GetRootSignature() == mCurGraphicsRootSignature)
-        return;
-
-    mCommandList->SetGraphicsRootSignature(mCurGraphicsRootSignature = rootSig.GetRootSignature());
-}
-
-void GraphicsCommandList::SetPipelineState(const PipelineState& pso)
-{
-    SetRootSignature(pso.GetRootSignature());
-    CommandList::SetPipelineState(pso);
-}
-
-void GraphicsCommandList::SetDescriptorTable(UINT rootIndex, UINT offset, const DescriptorHandle& handle)
-{
-    SetDescriptorHeap(handle.GetType(), handle.GetDescriptorHeap());
-    mCommandList->SetGraphicsRootDescriptorTable(rootIndex, handle + offset);
-}
-
-void GraphicsCommandList::SetDescriptorTable(UINT rootIndex, const DescriptorHandle& firstHandle)
-{
-    SetDescriptorTable(rootIndex, 0, firstHandle);
-}
-
-void GraphicsCommandList::SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& ibView)
-{
-    mCommandList->IASetIndexBuffer(&ibView);
-}
-
-void GraphicsCommandList::SetVertexBuffer(UINT slot, const D3D12_VERTEX_BUFFER_VIEW& vbView)
-{
-    SetVertexBuffers(slot, 1, &vbView);
-}
-
-void GraphicsCommandList::SetVertexBuffers(UINT startSlot, UINT count, const D3D12_VERTEX_BUFFER_VIEW vbViews[])
-{
-    mCommandList->IASetVertexBuffers(startSlot, count, vbViews);
-}
-
-void GraphicsCommandList::SetDynamicVB(UINT slot, size_t numVertices, size_t vertexStride, const void* vbData)
-{
-    ASSERT(vbData != nullptr);
-
-    size_t bufferSize = numVertices * vertexStride;
-    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize);
-
-    CopyMemory(span.mCpuAddress, vbData, bufferSize);
-
-    D3D12_VERTEX_BUFFER_VIEW vbView;
-    vbView.BufferLocation = span.mGpuAddress;
-    vbView.SizeInBytes = (UINT)bufferSize;
-    vbView.StrideInBytes = (UINT)vertexStride;
-
-    mCommandList->IASetVertexBuffers(slot, 1, &vbView);
-}
-
-void GraphicsCommandList::SetDynamicIB(size_t indexCount, const uint16_t* ibData)
-{
-    ASSERT(ibData != nullptr);
-
-    size_t bufferSize = indexCount * sizeof(uint16_t);
-    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize);
-
-    CopyMemory(span.mCpuAddress, ibData, bufferSize);
-
-    D3D12_INDEX_BUFFER_VIEW ibView;
-    ibView.BufferLocation = span.mGpuAddress;
-    ibView.SizeInBytes = (UINT)bufferSize;
-    ibView.Format = DXGI_FORMAT_R16_UINT;
-
-    mCommandList->IASetIndexBuffer(&ibView);
-}
-
-void GraphicsCommandList::SetDynamicSRV(UINT rootIndex, size_t bufferSize, const void* bufferData)
-{
-    ASSERT(bufferData);
-    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize);
-    CopyMemory(span.mCpuAddress, bufferData, bufferSize);
-    mCommandList->SetGraphicsRootShaderResourceView(rootIndex, span.mGpuAddress);
-}
-
-void GraphicsCommandList::Draw(UINT vertexCount, UINT vertexStartOffset)
-{
-    DrawInstanced(vertexCount, 1, vertexStartOffset, 0);
-}
-
-void GraphicsCommandList::DrawIndexed(UINT indexCount, UINT startIndexLocation, INT baseVertexLocation)
-{
-    DrawIndexedInstanced(indexCount, 1, startIndexLocation, baseVertexLocation, 0);
-}
-
-void GraphicsCommandList::DrawInstanced(
-    UINT vertexCountPerInstance, UINT instanceCount, UINT startVertexLocation, UINT startInstanceLocation)
-{
-    FlushResourceBarriers();
-    mCommandList->DrawInstanced(vertexCountPerInstance, instanceCount, startVertexLocation, startInstanceLocation);
-}
-
-void GraphicsCommandList::DrawIndexedInstanced(
-    UINT indexCountPerInstance, UINT instanceCount, UINT startIndexLocation, INT baseVertexLocation, UINT startInstanceLocation)
-{
-    FlushResourceBarriers();
-    mCommandList->DrawIndexedInstanced(
-        indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
-}
-
-
 // -- ComputeCommandList --
 void ComputeCommandList::ClearUAV(GpuBuffer& target)
 {
@@ -978,4 +675,312 @@ void ComputeCommandList::Dispatch3D(
     Dispatch(Math::DivideByMultiple(threadCountX, groupSizeX), 
         Math::DivideByMultiple(threadCountY, groupSizeY), 
         Math::DivideByMultiple(threadCountZ, groupSizeZ));
+}
+
+
+// -- GraphicsCommandList --
+void GraphicsCommandList::ClearUAV(GpuBuffer& target)
+{
+    FlushResourceBarriers();
+
+    const UINT clearColor[4] = {};
+    mCommandList->ClearUnorderedAccessViewUint(target.GetUAV(), target.GetUAV(), target.GetResource(), clearColor, 0, nullptr);
+}
+
+void GraphicsCommandList::ClearUAV(ColorBuffer& target)
+{
+    FlushResourceBarriers();
+
+    CD3DX12_RECT clearRect(0, 0, (LONG)target.GetWidth(), (LONG)target.GetHeight());
+    const float* clearColor = target.GetClearColor().GetPtr();
+    mCommandList->ClearUnorderedAccessViewFloat(target.GetUAV(), target.GetUAV(), target.GetResource(), clearColor, 1, &clearRect);
+}
+
+void GraphicsCommandList::ClearColor(ColorBuffer& target, D3D12_RECT* rect)
+{
+    FlushResourceBarriers();
+    mCommandList->ClearRenderTargetView(target.GetRTV(), target.GetClearColor().GetPtr(), (rect == nullptr) ? 0 : 1, rect);
+}
+
+void GraphicsCommandList::ClearColor(ColorBuffer& target, float color[4], D3D12_RECT* rect)
+{
+    FlushResourceBarriers();
+    mCommandList->ClearRenderTargetView(target.GetRTV(), color, (rect == nullptr) ? 0 : 1, rect);
+}
+
+void GraphicsCommandList::ClearDepth(DepthBuffer& target)
+{
+    FlushResourceBarriers();
+    mCommandList->ClearDepthStencilView(
+        target.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
+}
+
+void GraphicsCommandList::ClearStencil(DepthBuffer& target)
+{
+    FlushResourceBarriers();
+    mCommandList->ClearDepthStencilView(
+        target.GetDSV(), D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
+}
+
+void GraphicsCommandList::ClearDepthAndStencil(DepthBuffer& target)
+{
+    FlushResourceBarriers();
+    mCommandList->ClearDepthStencilView(
+        target.GetDSV(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
+}
+
+void GraphicsCommandList::BeginQuery(ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT heapIndex)
+{
+    mCommandList->BeginQuery(queryHeap, type, heapIndex);
+}
+
+void GraphicsCommandList::EndQuery(ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT heapIndex)
+{
+    mCommandList->EndQuery(queryHeap, type, heapIndex);
+}
+
+void GraphicsCommandList::ResolveQueryData(
+    ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT startIndex, UINT numQueries, ID3D12Resource* destinationBuffer, UINT64 destinationBufferOffset)
+{
+    mCommandList->ResolveQueryData(queryHeap, type, startIndex, numQueries, destinationBuffer, destinationBufferOffset);
+}
+
+void GraphicsCommandList::SetRenderTargets(UINT numRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE rtvs[])
+{
+    mCommandList->OMSetRenderTargets(numRTVs, rtvs, FALSE, nullptr);
+}
+
+void GraphicsCommandList::SetRenderTargets(UINT numRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE rtvs[], D3D12_CPU_DESCRIPTOR_HANDLE dsv)
+{
+    mCommandList->OMSetRenderTargets(numRTVs, rtvs, FALSE, &dsv);
+}
+
+void GraphicsCommandList::SetViewport(const D3D12_VIEWPORT& vp)
+{
+    mCommandList->RSSetViewports(1, &vp);
+}
+
+void GraphicsCommandList::SetViewport(FLOAT x, FLOAT y, FLOAT w, FLOAT h, FLOAT minDepth, FLOAT maxDepth)
+{
+    D3D12_VIEWPORT vp;
+    vp.Width = w;
+    vp.Height = h;
+    vp.MinDepth = minDepth;
+    vp.MaxDepth = maxDepth;
+    vp.TopLeftX = x;
+    vp.TopLeftY = y;
+    mCommandList->RSSetViewports(1, &vp);
+}
+
+void GraphicsCommandList::SetScissor(const D3D12_RECT& rect)
+{
+    ASSERT(rect.left < rect.right&& rect.top < rect.bottom);
+    mCommandList->RSSetScissorRects(1, &rect);
+}
+
+void GraphicsCommandList::SetScissor(UINT left, UINT top, UINT right, UINT bottom)
+{
+    SetScissor(CD3DX12_RECT(left, top, right, bottom));
+}
+
+void GraphicsCommandList::SetViewportAndScissor(const D3D12_VIEWPORT& vp, const D3D12_RECT& rect)
+{
+    SetViewport(vp);
+    SetScissor(rect);
+}
+
+void GraphicsCommandList::SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h)
+{
+    SetViewport((float)x, (float)y, (float)w, (float)h);
+    SetScissor(x, y, x + w, y + h);
+}
+
+void GraphicsCommandList::SetStencilRef(UINT stencilRef)
+{
+    mCommandList->OMSetStencilRef(stencilRef);
+}
+
+void GraphicsCommandList::SetBlendFactor(Color blendFactor)
+{
+    mCommandList->OMSetBlendFactor(blendFactor.GetPtr());
+}
+
+void GraphicsCommandList::SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology)
+{
+    mCommandList->IASetPrimitiveTopology(topology);
+}
+
+void GraphicsCommandList::SetConstantArray(UINT rootIndex, UINT numConstants, const void* pConstants)
+{
+    mCommandList->SetGraphicsRoot32BitConstants(rootIndex, numConstants, pConstants, 0);
+}
+
+void GraphicsCommandList::SetConstant(UINT rootIndex, UINT offset, DWParam val)
+{
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, val.Uint, offset);
+}
+
+void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x)
+{
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
+}
+
+void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x, DWParam y)
+{
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
+}
+
+void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z)
+{
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, z.Uint, 2);
+}
+
+void GraphicsCommandList::SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z, DWParam w)
+{
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, z.Uint, 2);
+    mCommandList->SetGraphicsRoot32BitConstant(rootIndex, w.Uint, 3);
+}
+
+void GraphicsCommandList::SetConstantBuffer(UINT rootIndex, D3D12_GPU_VIRTUAL_ADDRESS cbv)
+{
+    mCommandList->SetGraphicsRootConstantBufferView(rootIndex, cbv);
+}
+
+void GraphicsCommandList::SetDynamicConstantBufferView(UINT rootIndex, size_t bufferSize, const void* bufferData)
+{
+    ASSERT(bufferData);
+    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize, 256);
+    CopyMemory(span.mCpuAddress, bufferData, bufferSize);
+    mCommandList->SetGraphicsRootConstantBufferView(rootIndex, span.mGpuAddress);
+}
+
+void GraphicsCommandList::SetBufferSRV(UINT rootIndex, const GpuBuffer& srv, UINT64 offset)
+{
+    D3D12_RESOURCE_STATES usageState = GetResourceStateCache(const_cast<GpuBuffer&>(srv)).mStateCurrent;
+    ASSERT((usageState & (D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)) != 0);
+    mCommandList->SetGraphicsRootShaderResourceView(rootIndex, srv.GetGpuVirtualAddress() + offset);
+}
+
+void GraphicsCommandList::SetBufferUAV(UINT rootIndex, const GpuBuffer& uav, UINT64 offset)
+{
+    D3D12_RESOURCE_STATES usageState = GetResourceStateCache(const_cast<GpuBuffer&>(uav)).mStateCurrent;
+    ASSERT((usageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS) != 0);
+    mCommandList->SetGraphicsRootUnorderedAccessView(rootIndex, uav.GetGpuVirtualAddress() + offset);
+}
+
+void GraphicsCommandList::SetRootSignature(const RootSignature& rootSig)
+{
+    if (rootSig.GetRootSignature() == mCurGraphicsRootSignature)
+        return;
+
+    mCommandList->SetGraphicsRootSignature(mCurGraphicsRootSignature = rootSig.GetRootSignature());
+}
+
+void GraphicsCommandList::SetPipelineState(const PipelineState& pso)
+{
+    SetRootSignature(pso.GetRootSignature());
+    CommandList::SetPipelineState(pso);
+}
+
+void GraphicsCommandList::SetDescriptorTable(UINT rootIndex, UINT offset, const DescriptorHandle& handle)
+{
+    SetDescriptorHeap(handle.GetType(), handle.GetDescriptorHeap());
+    mCommandList->SetGraphicsRootDescriptorTable(rootIndex, handle + offset);
+}
+
+void GraphicsCommandList::SetDescriptorTable(UINT rootIndex, const DescriptorHandle& firstHandle)
+{
+    SetDescriptorTable(rootIndex, 0, firstHandle);
+}
+
+void GraphicsCommandList::SetDescriptorTable(UINT rootIndex, D3D12_GPU_DESCRIPTOR_HANDLE handle)
+{
+    mCommandList->SetGraphicsRootDescriptorTable(rootIndex, handle);
+}
+
+void GraphicsCommandList::SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& ibView)
+{
+    mCommandList->IASetIndexBuffer(&ibView);
+}
+
+void GraphicsCommandList::SetVertexBuffer(UINT slot, const D3D12_VERTEX_BUFFER_VIEW& vbView)
+{
+    SetVertexBuffers(slot, 1, &vbView);
+}
+
+void GraphicsCommandList::SetVertexBuffers(UINT startSlot, UINT count, const D3D12_VERTEX_BUFFER_VIEW vbViews[])
+{
+    mCommandList->IASetVertexBuffers(startSlot, count, vbViews);
+}
+
+void GraphicsCommandList::SetDynamicVB(UINT slot, size_t numVertices, size_t vertexStride, const void* vbData)
+{
+    ASSERT(vbData != nullptr);
+
+    size_t bufferSize = numVertices * vertexStride;
+    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize);
+
+    CopyMemory(span.mCpuAddress, vbData, bufferSize);
+
+    D3D12_VERTEX_BUFFER_VIEW vbView;
+    vbView.BufferLocation = span.mGpuAddress;
+    vbView.SizeInBytes = (UINT)bufferSize;
+    vbView.StrideInBytes = (UINT)vertexStride;
+
+    mCommandList->IASetVertexBuffers(slot, 1, &vbView);
+}
+
+void GraphicsCommandList::SetDynamicIB(size_t indexCount, const uint16_t* ibData)
+{
+    ASSERT(ibData != nullptr);
+
+    size_t bufferSize = indexCount * sizeof(uint16_t);
+    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize);
+
+    CopyMemory(span.mCpuAddress, ibData, bufferSize);
+
+    D3D12_INDEX_BUFFER_VIEW ibView;
+    ibView.BufferLocation = span.mGpuAddress;
+    ibView.SizeInBytes = (UINT)bufferSize;
+    ibView.Format = DXGI_FORMAT_R16_UINT;
+
+    mCommandList->IASetIndexBuffer(&ibView);
+}
+
+void GraphicsCommandList::SetDynamicSRV(UINT rootIndex, size_t bufferSize, const void* bufferData)
+{
+    ASSERT(bufferData);
+    AllocSpan span = mCpuLinearAllocator.Allocate(bufferSize);
+    CopyMemory(span.mCpuAddress, bufferData, bufferSize);
+    mCommandList->SetGraphicsRootShaderResourceView(rootIndex, span.mGpuAddress);
+}
+
+void GraphicsCommandList::Draw(UINT vertexCount, UINT vertexStartOffset)
+{
+    DrawInstanced(vertexCount, 1, vertexStartOffset, 0);
+}
+
+void GraphicsCommandList::DrawIndexed(UINT indexCount, UINT startIndexLocation, INT baseVertexLocation)
+{
+    DrawIndexedInstanced(indexCount, 1, startIndexLocation, baseVertexLocation, 0);
+}
+
+void GraphicsCommandList::DrawInstanced(
+    UINT vertexCountPerInstance, UINT instanceCount, UINT startVertexLocation, UINT startInstanceLocation)
+{
+    FlushResourceBarriers();
+    mCommandList->DrawInstanced(vertexCountPerInstance, instanceCount, startVertexLocation, startInstanceLocation);
+}
+
+void GraphicsCommandList::DrawIndexedInstanced(
+    UINT indexCountPerInstance, UINT instanceCount, UINT startIndexLocation, INT baseVertexLocation, UINT startInstanceLocation)
+{
+    FlushResourceBarriers();
+    mCommandList->DrawIndexedInstanced(
+        indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
 }

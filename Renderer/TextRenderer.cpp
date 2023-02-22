@@ -40,6 +40,8 @@ namespace TextRenderer
         ~Font()
         {
             m_Dictionary.clear();
+
+            DEALLOC_DESCRIPTOR_GPU(mTextureGpu, 1);
         }
 
         void LoadFromBinary(const wchar_t* fontName, const uint8_t* pBinary, const size_t binarySize)
@@ -83,6 +85,8 @@ namespace TextRenderer
 
             m_Texture.mName = L"Textrender Font";
             m_Texture.Create2D(textureWidth, textureWidth, textureHeight, DXGI_FORMAT_R8_SNORM, texelData);
+            mTextureGpu = ALLOC_DESCRIPTOR_GPU(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+            Graphics::gDevice->CopyDescriptorsSimple(1, mTextureGpu, m_Texture.GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
             Utility::PrintMessage("Loaded SDF font:  %ls (ver. %d.%d)", fontName, header->majorVersion, header->minorVersion);
         }
@@ -127,6 +131,7 @@ namespace TextRenderer
 
         // Get the texture object
         const Texture& GetTexture(void) const { return m_Texture; }
+        DescriptorHandle GetTextureGpuSRV(void) const { return mTextureGpu; }
 
         float GetXNormalizationFactor() const { return m_NormalizeXCoord; }
         float GetYNormalizationFactor() const { return m_NormalizeYCoord; }
@@ -146,6 +151,7 @@ namespace TextRenderer
         uint16_t m_TextureWidth;
         uint16_t m_TextureHeight;
         Texture m_Texture;
+        DescriptorHandle mTextureGpu;
         map<wchar_t, Glyph> m_Dictionary;
     };
 
@@ -458,7 +464,7 @@ void TextContext::SetRenderState(GraphicsCommandList& commandList)
 
     if (m_TextureIsStale)
     {
-        commandList.SetDescriptorTable(2, 0, m_CurrentFont->GetTexture().GetSRV());
+        commandList.SetDescriptorTable(2, 0, m_CurrentFont->GetTextureGpuSRV());
         m_TextureIsStale = false;
     }
 }

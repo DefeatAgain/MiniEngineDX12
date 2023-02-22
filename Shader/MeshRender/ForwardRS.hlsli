@@ -3,9 +3,9 @@
     "CBV(b0, visibility = SHADER_VISIBILITY_VERTEX), " \
     "CBV(b0, visibility = SHADER_VISIBILITY_PIXEL), " \
     "CBV(b1), " \
-    "DescriptorTable(SRV(t0, numDescriptors = 5), visibility = SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(Sampler(s0, numDescriptors = 5), visibility = SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(SRV(t10, numDescriptors = 5), visibility = SHADER_VISIBILITY_PIXEL)," \
+    "DescriptorTable(SRV(t0, numDescriptors = 8), visibility = SHADER_VISIBILITY_PIXEL)," \
+    "DescriptorTable(Sampler(s0, numDescriptors = 8), visibility = SHADER_VISIBILITY_PIXEL)," \
+    "DescriptorTable(SRV(t10, numDescriptors = 8), visibility = SHADER_VISIBILITY_PIXEL)," \
     "StaticSampler(s10, maxAnisotropy = 8, visibility = SHADER_VISIBILITY_PIXEL)," \
     "StaticSampler(s11, visibility = SHADER_VISIBILITY_PIXEL," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \

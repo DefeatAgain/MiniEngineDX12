@@ -31,7 +31,8 @@ struct VSOutput
 VSOutput main(VSInput vsInput)
 {
     VSOutput vsOutput;
-    vsOutput.positionSV = mul(gViewProjMatrix, float4(vsInput.position, 1.0));
+    float4 worldPos = mul(gWorldMatrix, float4(vsInput.position, 1.0));
+    vsOutput.positionSV = mul(gViewProjMatrix, worldPos);
 #ifdef ENABLE_ALPHATEST
     vsOutput.uv0 = vsInput.uv0;
 #endif

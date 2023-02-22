@@ -146,6 +146,7 @@ class CopyCommandList : public CommandList
     friend class FrameContextManager;
 protected:
     CopyCommandList() : CommandList(D3D12_COMMAND_LIST_TYPE_COPY) {}
+    CopyCommandList(D3D12_COMMAND_LIST_TYPE typeInherit) : CommandList(typeInherit) {}
 public:
     CopyCommandList& Begin(const std::wstring& id = L"")
     {
@@ -176,11 +177,54 @@ public:
 };
 
 
-class GraphicsCommandList : public CommandList
+class ComputeCommandList : public CopyCommandList
 {
     friend class FrameContextManager;
 protected:
-    GraphicsCommandList() : CommandList(D3D12_COMMAND_LIST_TYPE_DIRECT) {}
+    ComputeCommandList() : CopyCommandList(D3D12_COMMAND_LIST_TYPE_COMPUTE) {}
+    ComputeCommandList(D3D12_COMMAND_LIST_TYPE typeInherit) : CopyCommandList(typeInherit) {}
+public:
+    ComputeCommandList& Begin(const std::wstring& id = L"")
+    {
+        CommandList::Begin(id);
+        return *this;
+    }
+
+    void ClearUAV(GpuBuffer& target);
+    void ClearUAV(ColorBuffer& target);
+
+    void SetConstantArray(UINT rootIndex, UINT numConstants, const void* pConstants);
+    void SetConstant(UINT rootIndex, UINT offset, DWParam val);
+    void SetConstants(UINT rootIndex, DWParam x);
+    void SetConstants(UINT rootIndex, DWParam x, DWParam y);
+    void SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z);
+    void SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z, DWParam w);
+    void SetConstantBuffer(UINT rootIndex, D3D12_GPU_VIRTUAL_ADDRESS cbv);
+    void SetDynamicConstantBufferView(UINT rootIndex, size_t bufferSize, const void* bufferData);
+    void SetDynamicSRV(UINT rootIndex, size_t bufferSize, const void* bufferData);
+    void SetBufferSRV(UINT rootIndex, const GpuBuffer& srv, UINT64 offset = 0);
+    void SetBufferUAV(UINT rootIndex, const GpuBuffer& uav, UINT64 offset = 0);
+
+    void SetRootSignature(const RootSignature& rootSig);
+    void SetPipelineState(const PipelineState& pso);
+    void SetDescriptorTable(UINT rootIndex, const DescriptorHandle& firstHandle);
+    void SetDescriptorTable(UINT rootIndex, UINT offset, const DescriptorHandle& handle);
+
+    void Dispatch(size_t groupCountX = 1, size_t groupCountY = 1, size_t groupCountZ = 1);
+    void Dispatch1D(size_t threadCountX, size_t groupSizeX = 64);
+    void Dispatch2D(size_t threadCountX, size_t threadCountY, size_t groupSizeX = 8, size_t groupSizeY = 8);
+    void Dispatch3D(size_t threadCountX, size_t threadCountY, size_t threadCountZ, size_t groupSizeX, size_t groupSizeY, size_t groupSizeZ);
+    //void DispatchIndirect(GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset = 0);
+    //void ExecuteIndirect(CommandSignature& CommandSig, GpuBuffer& ArgumentBuffer, uint64_t ArgumentStartOffset = 0,
+        //uint32_t MaxCommands = 1, GpuBuffer* CommandCounterBuffer = nullptr, uint64_t CounterOffset = 0);
+};
+
+
+class GraphicsCommandList : public ComputeCommandList
+{
+    friend class FrameContextManager;
+protected:
+    GraphicsCommandList() : ComputeCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT) {}
 public:
     GraphicsCommandList& Begin(const std::wstring& id = L"")
     {
@@ -231,6 +275,7 @@ public:
     void SetPipelineState(const PipelineState& pso);
     void SetDescriptorTable(UINT rootIndex, UINT offset, const DescriptorHandle& handle);
     void SetDescriptorTable(UINT rootIndex, const DescriptorHandle& firstHandle);
+    void SetDescriptorTable(UINT rootIndex, D3D12_GPU_DESCRIPTOR_HANDLE handle);
 
     void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& ibView);
     void SetVertexBuffer(UINT slot, const D3D12_VERTEX_BUFFER_VIEW& vbView);
@@ -246,46 +291,4 @@ public:
     //void DrawIndirect(GpuBuffer& argumentBuffer, uint64_t argumentBufferOffset = 0);
     //void ExecuteIndirect(CommandSignature& commandSig, GpuBuffer& argumentBuffer, uint64_t argumentStartOffset = 0,
     //    uint32_t maxCommands = 1, GpuBuffer* commandCounterBuffer = nullptr, uint64_t counterOffset = 0);
-};
-
-
-class ComputeCommandList : public CommandList
-{
-    friend class FrameContextManager;
-protected:
-    ComputeCommandList() : CommandList(D3D12_COMMAND_LIST_TYPE_COMPUTE) {}
-public:
-    ComputeCommandList& Begin(const std::wstring& id = L"")
-    {
-        CommandList::Begin(id);
-        return *this;
-    }
-
-    void ClearUAV(GpuBuffer& target);
-    void ClearUAV(ColorBuffer& target);
-
-    void SetConstantArray(UINT rootIndex, UINT numConstants, const void* pConstants);
-    void SetConstant(UINT rootIndex, UINT offset, DWParam val);
-    void SetConstants(UINT rootIndex, DWParam x);
-    void SetConstants(UINT rootIndex, DWParam x, DWParam y);
-    void SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z);
-    void SetConstants(UINT rootIndex, DWParam x, DWParam y, DWParam z, DWParam w);
-    void SetConstantBuffer(UINT rootIndex, D3D12_GPU_VIRTUAL_ADDRESS cbv);
-    void SetDynamicConstantBufferView(UINT rootIndex, size_t bufferSize, const void* bufferData);
-    void SetDynamicSRV(UINT rootIndex, size_t bufferSize, const void* bufferData);
-    void SetBufferSRV(UINT rootIndex, const GpuBuffer& srv, UINT64 offset = 0);
-    void SetBufferUAV(UINT rootIndex, const GpuBuffer& uav, UINT64 offset = 0);
-
-    void SetRootSignature(const RootSignature& rootSig);
-    void SetPipelineState(const PipelineState& pso);
-    void SetDescriptorTable(UINT rootIndex, const DescriptorHandle& firstHandle);
-    void SetDescriptorTable(UINT rootIndex, UINT offset, const DescriptorHandle& handle);
-
-    void Dispatch(size_t groupCountX = 1, size_t groupCountY = 1, size_t groupCountZ = 1);
-    void Dispatch1D(size_t threadCountX, size_t groupSizeX = 64);
-    void Dispatch2D(size_t threadCountX, size_t threadCountY, size_t groupSizeX = 8, size_t groupSizeY = 8);
-    void Dispatch3D(size_t threadCountX, size_t threadCountY, size_t threadCountZ, size_t groupSizeX, size_t groupSizeY, size_t groupSizeZ);
-    //void DispatchIndirect(GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset = 0);
-    //void ExecuteIndirect(CommandSignature& CommandSig, GpuBuffer& ArgumentBuffer, uint64_t ArgumentStartOffset = 0,
-        //uint32_t MaxCommands = 1, GpuBuffer* CommandCounterBuffer = nullptr, uint64_t CounterOffset = 0);
 };

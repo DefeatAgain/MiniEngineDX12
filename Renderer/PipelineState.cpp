@@ -6,7 +6,7 @@
 namespace
 {
 	std::queue<std::future<void>> sInitPipeStatTasks;
-	bool sIsFirstInitPipeStatMgr = false;
+	bool sIsFirstInitPipeStatMgr = true;
 }
 
 

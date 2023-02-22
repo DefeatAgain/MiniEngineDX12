@@ -8,8 +8,6 @@ class DescriptorAllocator
 {
     friend class DescriptorHandle;
 
-    using BITMAP_TYPE = uint32_t;
-
     struct SubHeap
     {
         DescriptorAllocator& mOwningAllocator;
@@ -18,16 +16,18 @@ class DescriptorAllocator
         D3D12_CPU_DESCRIPTOR_HANDLE mCpuStartHandle;
         D3D12_GPU_DESCRIPTOR_HANDLE mGpuStartHandle;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
-        std::vector<BITMAP_TYPE> mBitMap;
+        uint32_t mBitMap[63]; // all tree node size 2^6 - 1
         //std::vector<size_t> mPerLayerRemainHandles; // simple handle all layer has same remain handles
 
         SubHeap(DescriptorAllocator& owningAlloc) : mOwningAllocator(owningAlloc),
             mNumRemainHandles(MAX_DESCRIPTOR_HEAP_SIZE), mNumReleasedHandles(0)
-        {}
+        {
+            ZeroMemory(&mBitMap, sizeof(mBitMap));
+        }
         ~SubHeap() {}
     };
 public:
-    DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE heapType);
+    DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE heapType, bool gpuVisible = false);
 
     ~DescriptorAllocator() { Clear(); }
 
@@ -48,19 +48,16 @@ private:
     DescriptorHandle AllocateLayer(uint32_t startLayerNodeIdx, uint32_t totalNodeSize, size_t alignedCount);
     
     uint8_t AllocNewHeap();
-
-    void TreeShiftSetBit(std::vector<uint32_t>& bitMap, int startIdx, size_t startBitIdx);
-
-    void TreeShiftResetBit(std::vector<uint32_t>& bitMap, int startIdx, size_t startBitIdx);
 private:
     D3D12_DESCRIPTOR_HEAP_TYPE mType;
+    bool mGpuVisible;
     UINT mDescriptorSize;
     uint8_t mCurrentHeapIndex;
     std::mutex mAllocatorMutex;
     std::vector<SubHeap*> mDescriptorHeapPool;
 };
 
-#define UNKNOWN_OFFSET (((uint64_t)-1) >> 10)
+#define UNKNOWN_OFFSET (((uint64_t)-1) >> 11)
 
 class DescriptorHandle
 {
@@ -85,25 +82,26 @@ class DescriptorHandle
         return other - offset;
     }
 private:
-    DescriptorHandle(size_t offset, uint8_t owningIndex, uint8_t type) :
-        mOffset(offset), mOwningHeapIndex(owningIndex), mType(type)
+    DescriptorHandle(size_t offset, uint8_t owningIndex, uint8_t type, bool gpuVisible) :
+        mOffset(offset), mOwningHeapIndex(owningIndex), mType(type), mGpuVisible(gpuVisible)
     {}
+
+    DescriptorAllocator& GetAlloc() const;
 public:
     DescriptorHandle() :
-        mOffset(UNKNOWN_OFFSET), mOwningHeapIndex(0), mType(0)
+        mOffset(UNKNOWN_OFFSET), mOwningHeapIndex(0), mType(0), mGpuVisible(0)
     {}
 
     void operator+= (INT offset)
     {
-        if (mOffset != 0)
-            mOffset = offset + static_cast<INT>(mOffset);
+        ASSERT(offset != UNKNOWN_OFFSET);
         mOffset = offset + static_cast<INT>(mOffset);
     }
 
     void operator+= (UINT offset)
     {
-        if (mOffset != 0)
-            mOffset += offset;
+        ASSERT(offset != UNKNOWN_OFFSET);
+        mOffset += offset;
     }
 
     void operator-= (INT Offset) { *this += -1; }
@@ -145,7 +143,9 @@ public:
 
     ID3D12DescriptorHeap* GetDescriptorHeap() const;
 
-    operator bool() const { return mOffset != UNKNOWN_OFFSET; }
+    bool IsNull() const { return mOffset == UNKNOWN_OFFSET; }
+
+    operator bool() const { return !IsNull(); }
 
     operator D3D12_CPU_DESCRIPTOR_HANDLE()
     {
@@ -156,20 +156,24 @@ public:
 
     operator D3D12_GPU_DESCRIPTOR_HANDLE()
     {
+        ASSERT(mGpuVisible);
+
         D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
         gpuHandle.ptr = GetGpuPtr();
         return gpuHandle;
     }
 
-    operator const D3D12_CPU_DESCRIPTOR_HANDLE() const
+    operator D3D12_CPU_DESCRIPTOR_HANDLE() const
     {
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
         cpuHandle.ptr = GetCpuPtr();
         return cpuHandle;
     }
 
-    operator const D3D12_GPU_DESCRIPTOR_HANDLE() const
+    operator D3D12_GPU_DESCRIPTOR_HANDLE() const
     {
+        ASSERT(mGpuVisible);
+
         D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
         gpuHandle.ptr = GetGpuPtr();
         return gpuHandle;
@@ -179,9 +183,10 @@ public:
 
     uint64_t GetGpuPtr() const;
 private:
-    uint64_t mOffset : 54;
+    uint64_t mOffset : 53;
     uint64_t mOwningHeapIndex : 8;
     uint64_t mType : 2;
+    uint64_t mGpuVisible : 1;
 };
 
 
@@ -189,21 +194,9 @@ class DescriptorAllocatorManager : public Singleton<DescriptorAllocatorManager>
 {
     USE_SINGLETON;
 
-    DescriptorAllocatorManager() 
-    {
-        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
-        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
-        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
-        mDescriptorAllocators.emplace_back(new DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
-    }
+    DescriptorAllocatorManager();
 public:
-    ~DescriptorAllocatorManager() 
-    {
-        for (size_t i = 0; i < mDescriptorAllocators.size(); i++)
-        {
-            delete mDescriptorAllocators[i];
-        }
-    }
+    ~DescriptorAllocatorManager();
 
     DescriptorHandle AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE type, UINT count = 1)
     {
@@ -212,18 +205,37 @@ public:
 
     void DeAllocateDescriptor(DescriptorHandle& handle, UINT count)
     {
+        if (mDescriptorAllocators.empty())
+            return;
         mDescriptorAllocators[handle.mType]->Deallocate(handle, count);
     }
 
+    DescriptorHandle AllocateDescriptorGpu(D3D12_DESCRIPTOR_HEAP_TYPE type, UINT count = 1)
+    {
+        return mDescriptorAllocators[type + D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES]->Allocate(count);
+    }
+
+    void DeAllocateDescriptorGpu(DescriptorHandle& handle, UINT count)
+    {
+        if (mDescriptorAllocators.empty())
+            return;
+        mDescriptorAllocators[handle.mType + D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES]->Deallocate(handle, count);
+    }
+
     DescriptorAllocator& GetAlloc(D3D12_DESCRIPTOR_HEAP_TYPE type) { return *mDescriptorAllocators[type]; }
+
+    DescriptorAllocator& GetAllocGpu(D3D12_DESCRIPTOR_HEAP_TYPE type) { return *mDescriptorAllocators[type + D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES]; }
 private:
     std::vector<DescriptorAllocator*> mDescriptorAllocators;
 };
 
 #define GET_DESCRIPTOR_ALLOC(type) DescriptorAllocatorManager::GetInstance()->GetAlloc(type)
+#define GET_DESCRIPTOR_ALLOC_GPU(type) DescriptorAllocatorManager::GetInstance()->GetAllocGpu(type)
 #define ALLOC_DESCRIPTOR(type, count) DescriptorAllocatorManager::GetInstance()->AllocateDescriptor(type, count)
 #define ALLOC_DESCRIPTOR1(type) ALLOC_DESCRIPTOR(type, 1)
 #define DEALLOC_DESCRIPTOR(handle, count) DescriptorAllocatorManager::GetInstance()->DeAllocateDescriptor(handle, count)
+#define ALLOC_DESCRIPTOR_GPU(type, count) DescriptorAllocatorManager::GetInstance()->AllocateDescriptorGpu(type, count)
+#define DEALLOC_DESCRIPTOR_GPU(handle, count) DescriptorAllocatorManager::GetInstance()->DeAllocateDescriptorGpu(handle, count)
 
 
 // LinearAllocForGpu
@@ -233,13 +245,16 @@ public:
     DescriptorLinearAlloc(D3D12_DESCRIPTOR_HEAP_TYPE type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, size_t size = 64);
     ~DescriptorLinearAlloc() {}
 
-    D3D12_GPU_DESCRIPTOR_HANDLE Map(DescriptorHandle handle, size_t index,  size_t size);
-    //D3D12_GPU_DESCRIPTOR_HANDLE Map(DescriptorHandle handles[], size_t size);
+    D3D12_GPU_DESCRIPTOR_HANDLE Map(DescriptorHandle handles[], size_t size, size_t index = -1);
+    D3D12_GPU_DESCRIPTOR_HANDLE Map(DescriptorHandle handle, size_t index);
 
     D3D12_GPU_DESCRIPTOR_HANDLE GetStart() const { return mGpuStart; }
+    D3D12_DESCRIPTOR_HEAP_TYPE GetType() const { return mType; }
+    ID3D12DescriptorHeap* GetHeap() { return mDescriptorHeap.Get(); }
 private:
     D3D12_DESCRIPTOR_HEAP_TYPE mType;
     D3D12_CPU_DESCRIPTOR_HANDLE mCpuStart;
     D3D12_GPU_DESCRIPTOR_HANDLE mGpuStart;
+    size_t mCurrentOffset;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
 };

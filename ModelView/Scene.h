@@ -41,9 +41,11 @@ public:
     float GetIBLBias() const { return mSpecularIBLBias; }
     float GetIBLRange() const { return mSpecularIBLRange; }
 
+    DescriptorHandle GetSceneTextureHandles() const { return mSceneTextureGpuHandle; }
+
     void UpdateModels();
 private:
-    void MapLinearDescriptors();
+    void MapGpuDescriptors();
 
     void UpdateModelBoundingSphere();
 
@@ -69,5 +71,5 @@ private:
     float mSpecularIBLRange;
     float mSpecularIBLBias;
 
-    DescriptorLinearAlloc mSceneTexturesAlloc;
+    DescriptorHandle mSceneTextureGpuHandle;
 };

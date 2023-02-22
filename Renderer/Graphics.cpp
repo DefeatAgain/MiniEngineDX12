@@ -21,6 +21,8 @@ namespace
     ColorBuffer gDisplayPlane[SWAP_CHAIN_BUFFER_COUNT];
     ColorBuffer gSceneColorBuffer[SWAP_CHAIN_BUFFER_COUNT];
     DepthBuffer gSceneDepthBuffer[SWAP_CHAIN_BUFFER_COUNT];
+    DescriptorHandle gSceneColorBufferGpuSRV;
+    DescriptorHandle gSceneDepthBufferGpuSRV;
 
     float sFrameTime = 0.0f;
     uint64_t sFrameIndex = 0;
@@ -147,6 +149,16 @@ namespace Graphics
     DepthBuffer& GetSceneDepthBuffer(size_t i)
     {
         return gSceneDepthBuffer[i];
+    }
+
+    DescriptorHandle GetSceneColorBufferSRV(uint32_t i)
+    {
+        return gSceneColorBufferGpuSRV + i;
+    }
+
+    DescriptorHandle GetSceneDepthBufferSRV(uint32_t i)
+    {
+        return gSceneDepthBufferGpuSRV + i;
     }
 
     D3D12_VIEWPORT GetDefaultViewPort()
@@ -304,6 +316,8 @@ namespace Graphics
         }
 #endif // End CONDITIONALLY_ENABLE_HDR_OUTPUT
 
+        gSceneColorBufferGpuSRV = ALLOC_DESCRIPTOR_GPU(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, SWAP_CHAIN_BUFFER_COUNT);
+        gSceneDepthBufferGpuSRV = ALLOC_DESCRIPTOR_GPU(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, SWAP_CHAIN_BUFFER_COUNT);
         for (uint32_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
         {
             ID3D12Resource* displayPlane = nullptr;
@@ -312,6 +326,9 @@ namespace Graphics
 
             gSceneColorBuffer[i].Create(L"Scene Color Buffer", gRenderWidth, gRenderHeight, 1, HDR_FORMAT);
             gSceneDepthBuffer[i].Create(L"Scene Depth Buffer", gRenderWidth, gRenderHeight, 1, DSV_FORMAT);
+
+            Graphics::gDevice->CopyDescriptorsSimple(1, gSceneColorBufferGpuSRV + i, gSceneColorBuffer[i].GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            Graphics::gDevice->CopyDescriptorsSimple(1, gSceneDepthBufferGpuSRV + i, gSceneDepthBuffer[i].GetDepthSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         }
     }
 
@@ -331,6 +348,9 @@ namespace Graphics
 
             gSceneColorBuffer[i].Create(L"Scene Color Buffer", width, height, 1, HDR_FORMAT);
             gSceneDepthBuffer[i].Create(L"Scene Depth Buffer", gRenderWidth, gRenderHeight, 1, DSV_FORMAT);
+
+            Graphics::gDevice->CopyDescriptorsSimple(1, gSceneColorBufferGpuSRV + i, gSceneColorBuffer[i].GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            Graphics::gDevice->CopyDescriptorsSimple(1, gSceneDepthBufferGpuSRV + i, gSceneDepthBuffer[i].GetDepthSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         }
            
         FrameContextManager::GetInstance()->OnResizeSceneBuffer(width, height);
@@ -424,7 +444,7 @@ namespace Graphics
         CommandLineArgs::GetInteger(L"debug", useDebugLayers);
 #if _DEBUG
         // Default to true for debug builds
-        useDebugLayers = 1;
+        useDebugLayers = 0;
 #endif
 
         DWORD dxgiFactoryFlags = 0;
@@ -452,7 +472,7 @@ namespace Graphics
 
 #if _DEBUG
             Microsoft::WRL::ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
-            if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(dxgiInfoQueue.GetAddressOf()))))
+            if (useDebugLayers && SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(dxgiInfoQueue.GetAddressOf()))))
             {
                 dxgiFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
 
@@ -568,7 +588,7 @@ namespace Graphics
 
 #if _DEBUG
         ID3D12InfoQueue* pInfoQueue = nullptr;
-        if (SUCCEEDED(gDevice->QueryInterface(IID_PPV_ARGS(&pInfoQueue))))
+        if (useDebugLayers && SUCCEEDED(gDevice->QueryInterface(IID_PPV_ARGS(&pInfoQueue))))
         {
             //pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
             pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);

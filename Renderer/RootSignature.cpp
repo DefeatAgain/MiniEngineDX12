@@ -8,7 +8,7 @@ namespace
     std::unordered_map<std::wstring, RootSignature> sRootSigs;
 
     std::queue<std::future<void>> sInitRootSigTasks;
-    bool sIsFirstInitRootSigManager = false;
+    bool sIsFirstInitRootSigManager = true;
 }
 
 void RootSignature::InitStaticSampler(

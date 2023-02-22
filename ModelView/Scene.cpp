@@ -53,51 +53,57 @@ CommandList* Scene::RenderScene(CommandList* context)
     ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     ghContext.ClearDepth(depthBuffer);
 
-    //MeshRenderer meshRenderer(MeshRenderer::kDefault);
-    //meshRenderer.SetCamera(mSceneCamera);
-    //meshRenderer.SetScene(*this);
-    //meshRenderer.SetViewport(Graphics::GetDefaultViewPort());
-    //meshRenderer.SetScissor(Graphics::GetDefaultScissor());
-    //meshRenderer.SetDepthStencilTarget(depthBuffer);
-    //meshRenderer.AddRenderTarget(colorBuffer);
+    MeshRenderer meshRenderer(MeshRenderer::kDefault);
+    meshRenderer.SetCamera(mSceneCamera);
+    meshRenderer.SetScene(*this);
+    meshRenderer.SetViewport(Graphics::GetDefaultViewPort());
+    meshRenderer.SetScissor(Graphics::GetDefaultScissor());
+    meshRenderer.SetDepthStencilTarget(depthBuffer);
+    meshRenderer.AddRenderTarget(colorBuffer);
 
-    //for (size_t i = 0; i < mModels.size(); i++)
-    //{
-    //    mModels[i].Render(meshRenderer, mModelTransform[i], 
-    //        mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
-    //}
+    for (size_t i = 0; i < mModels.size(); i++)
+    {
+        mModels[i].Render(meshRenderer, mModelTransform[i], 
+            mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
+    }
 
-    //meshRenderer.Sort();
-    //meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
+    meshRenderer.Sort();
+    ghContext.PIXBeginEvent(L"PreZ");
+    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
+    ghContext.PIXEndEvent();
 
-    //MeshRenderer shadowRenderer(MeshRenderer::kShadows);
-    //ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
-    //shadowRenderer.SetScene(*this);
-    //shadowRenderer.SetCamera(mShadowCamera);
-    //shadowRenderer.SetDepthStencilTarget(shadowBuffer);
+    MeshRenderer shadowRenderer(MeshRenderer::kShadows);
+    ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
+    shadowRenderer.SetScene(*this);
+    shadowRenderer.SetCamera(mShadowCamera);
+    shadowRenderer.SetDepthStencilTarget(shadowBuffer);
 
-    //for (size_t i = 0; i < mModels.size(); i++)
-    //{
-    //    mModels[i].Render(shadowRenderer, mModelTransform[i], 
-    //        mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
-    //}
+    for (size_t i = 0; i < mModels.size(); i++)
+    {
+        mModels[i].Render(shadowRenderer, mModelTransform[i], 
+            mMeshConstantsUploader.GetGpuVirtualAddress() + Math::AlignUp(sizeof(ModelConstants), 256) * i);
+    }
 
-    //shadowRenderer.Sort();
-    //shadowRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
+    shadowRenderer.Sort();
+    ghContext.PIXBeginEvent(L"ShadowMap");
+    shadowRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
+    ghContext.PIXEndEvent();
 
-    //ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    //ghContext.ClearColor(colorBuffer);
+    ghContext.TransitionResource(colorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    ghContext.ClearColor(colorBuffer);
 
     //context->TransitionResource(g_SSAOFullScreen, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    //ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-    //ghContext.SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
-    //ghContext.SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
-    //meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kOpaque);
+    ghContext.TransitionResource(depthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    ghContext.SetRenderTarget(colorBuffer.GetRTV(), depthBuffer.GetDSV_DepthReadOnly());
+    ghContext.SetViewportAndScissor(Graphics::GetDefaultViewPort(), Graphics::GetDefaultScissor());
+    ghContext.PIXBeginEvent(L"Mesh");
+    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kOpaque);
 
     RenderSkyBox(ghContext);
 
-    //meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kTransparent);
+    meshRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kTransparent);
 
+    ghContext.PIXEndEvent();
     ghContext.Finish();
     return context;
 }
@@ -120,7 +126,6 @@ void Scene::RenderSkyBox(GraphicsCommandList& ghContext)
 
     DepthBuffer& depthBuffer = CURRENT_SCENE_DEPTH_BUFFER;
     ColorBuffer& colorBuffer = CURRENT_SCENE_COLOR_BUFFER;
-    ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
 
     ghContext.SetPipelineState(*ModelRenderer::sSkyboxPSO);
 
@@ -131,7 +136,7 @@ void Scene::RenderSkyBox(GraphicsCommandList& ghContext)
 
     ghContext.SetDynamicConstantBufferView(ModelRenderer::kMeshConstants, sizeof(SkyboxVSCB), &skyVSCB);
     ghContext.SetDynamicConstantBufferView(ModelRenderer::kMaterialConstants, sizeof(SkyboxPSCB), &skyPSCB);
-    ghContext.SetDescriptorTable(ModelRenderer::kSceneTextures, mSceneTexturesAlloc.GetStart());
+    ghContext.SetDescriptorTable(ModelRenderer::kSceneTextures, mSceneTextureGpuHandle);
     ghContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ghContext.Draw(3);
 }
@@ -155,11 +160,10 @@ void Scene::SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL)
     mRadianceCubeMap = specularIBL;
     mIrradianceCubeMap = diffuseIBL;
 
-    if (!diffuseIBL.IsValid())
-        const_cast<Texture*>(diffuseIBL.Get())->ForceWaitContext();
+    diffuseIBL.WaitForValid();
+    specularIBL.WaitForValid();
 
-    if (!specularIBL.IsValid())
-        const_cast<Texture*>(specularIBL.Get())->ForceWaitContext();
+    MapGpuDescriptors();
 }
 
 void Scene::UpdateModels()
@@ -201,7 +205,7 @@ void Scene::UpdateModels()
     mDirtyModels = false;
 }
 
-void Scene::MapLinearDescriptors()
+void Scene::MapGpuDescriptors()
 {
     ShadowBuffer& shadowBuffer = ModelRenderer::GetCurrentShadowBuffer();
 
@@ -211,7 +215,16 @@ void Scene::MapLinearDescriptors()
     allHandles.emplace_back();
     allHandles.push_back(shadowBuffer.GetSRV());
 
+    ASSERT(allHandles.size() <= 8);
 
+    if (!mSceneTextureGpuHandle)
+        mSceneTextureGpuHandle = ALLOC_DESCRIPTOR_GPU(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 8);
+
+    for (uint32_t i = 0; i < allHandles.size(); i++)
+    {
+        if (allHandles[i])
+            Graphics::gDevice->CopyDescriptorsSimple(1, mSceneTextureGpuHandle + i, allHandles[i], D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
 }
 
 void Scene::UpdateModelBoundingSphere()

@@ -44,8 +44,13 @@ public:
 
     virtual size_t GetMaterialConstantSize() const = 0;
 
-    virtual DescriptorHandle GetTextureHandles() const { return DescriptorHandle(); }
-    virtual DescriptorHandle GetSamplerHandles() const { return DescriptorHandle(); }
+    virtual std::vector<DescriptorHandle> GetTextureCpuHandles() const { return std::vector<DescriptorHandle>(); }
+    virtual std::vector<DescriptorHandle> GetSamplerCpuHandles() const { return std::vector<DescriptorHandle>(); }
+
+    DescriptorHandle GetTextureGpuHandles() const { return mAllGpuTextureHandles; }
+    DescriptorHandle GetSamplerGpuHandles() const { return mAllGpuSamplerHandles; }
+
+    void UpdateDescriptor();
 
     uint16_t GetMaterialIdx() const { return mMaterialIdx; }
 
@@ -61,6 +66,9 @@ protected:
     uint16_t mMaterialIdx;           // Index of material
     uint32_t mBufferOffset;          // Offset of GpuBuffer, mutipile of 256 
     //uint16_t mPSOIndex;              // Index of pipeline state object
+
+    DescriptorHandle mAllGpuTextureHandles;
+    DescriptorHandle mAllGpuSamplerHandles;
 };
 
 
@@ -77,22 +85,18 @@ public:
         kNumTextures 
     };
 public:
-    PBRMaterial() : Material(kPBRMaterial) { CreateHandles(); }
-    ~PBRMaterial() { DestroyHandles(); }
+    PBRMaterial() : Material(kPBRMaterial) {}
+    ~PBRMaterial() {}
 
-    virtual DescriptorHandle GetTextureHandles() const override { return mTextureHandles; }
-    virtual DescriptorHandle GetSamplerHandles() const override { return mSamplerHandles; }
+    virtual std::vector<DescriptorHandle> GetTextureCpuHandles() const override;
+    virtual std::vector<DescriptorHandle> GetSamplerCpuHandles() const override;
 
     virtual const void* GetMaterialConstant() const override { return reinterpret_cast<const void*>(&mMaterialConstant); }
     virtual size_t GetMaterialConstantSize() const override { return sizeof(mMaterialConstant); }
-private:
-    void CreateHandles();
-    void DestroyHandles();
 public:
     PBRMaterialConstants mMaterialConstant;
     TextureRef mTextures[kNumTextures];
-    DescriptorHandle mSamplerHandles;
-    DescriptorHandle mTextureHandles;
+    DescriptorHandle mSamplerHandles[kNumTextures];
 };
 
 
@@ -131,7 +135,6 @@ public:
     {
         ASSERT(index <= 0x7FFF);
         mAllMaterials[index]->mNumDirtyCount = SWAP_CHAIN_BUFFER_COUNT;
-        mDirtyMaterialIndices.push_back(index);
     }
 
     void Update();
@@ -142,13 +145,12 @@ public:
         return mGpuBuffer[CURRENT_FARME_BUFFER_INDEX].GetGpuVirtualAddress() + 256 * material->mBufferOffset;
     }
 private:
-    uint16_t UpdateMaterial(size_t index);
+    void UpdateMaterial(size_t index);
 private:
     std::vector<std::unique_ptr<Material>> mAllMaterials;       // store by index
-    UploadBuffer mGpuBuffer[SWAP_CHAIN_BUFFER_COUNT];        // store frame resource index
-    std::list<uint16_t> mDirtyMaterialIndices;
-    uint16_t mConstantBufferSize;                                  // divided by 256
-    size_t mNumDirtyCount;
+    UploadBuffer mGpuBuffer[SWAP_CHAIN_BUFFER_COUNT];           // store frame resource index
+    uint32_t mConstantBufferSize;                               // divided by 256
+    uint32_t mNumDirtyCount;
 };
 
 #define UPDATE_MATERIAL(index) MaterialManager::GetInstance()->DirtyMaterial(index)

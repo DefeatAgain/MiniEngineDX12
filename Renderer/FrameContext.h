@@ -86,6 +86,8 @@ public:
     ColorBuffer& GetCurrentSwapChain();
     ColorBuffer& GetCurrentSceneColorBuffer();
     DepthBuffer& GetCurrentSceneDepthBuffer();
+    DescriptorHandle GetCurrentSceneColorBufferSRV();
+    DescriptorHandle GetCurrentSceneDepthBufferSRV();
     size_t GetCurFrameContextIdx() { return mCurFrameContextIdx; }
 
     void PushMutiGraphicsTask(const MutiGraphicsCommand& renderTask);
@@ -125,6 +127,8 @@ private:
 #define CURRENT_SWAP_CHAIN FrameContextManager::GetInstance()->GetCurrentSwapChain()
 #define CURRENT_SCENE_COLOR_BUFFER FrameContextManager::GetInstance()->GetCurrentSceneColorBuffer()
 #define CURRENT_SCENE_DEPTH_BUFFER FrameContextManager::GetInstance()->GetCurrentSceneDepthBuffer()
+#define CURRENT_SCENE_COLOR_BUFFERSRV FrameContextManager::GetInstance()->GetCurrentSceneColorBufferSRV()
+#define CURRENT_SCENE_DEPTH_BUFFERSRV FrameContextManager::GetInstance()->GetCurrentSceneDepthBufferSRV()
 #define CURRENT_FARME_BUFFER_INDEX FrameContextManager::GetInstance()->GetCurFrameContextIdx()
 #define REGISTER_CONTEXT(Renderable, ...) FrameContextManager::GetInstance()->RegisterContext<Renderable>(__VA_ARGS__);
 #define PUSH_MUTIRENDER_TASK(...) FrameContextManager::GetInstance()->PushMutiGraphicsTask(__VA_ARGS__);

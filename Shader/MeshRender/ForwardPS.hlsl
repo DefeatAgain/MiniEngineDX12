@@ -137,8 +137,8 @@ float4 main(PSIutput psInput) : SV_Target
 
     LightProperties light;
     float3 sunVec = gSunDirection - psInput.positionWorld;
-    light.distanceSqrDiv = dot(sunVec, sunVec);
-    light.wi = sunVec / sqrt(light.distanceSqrDiv);
+    light.distanceSqrDiv = 1.0 / dot(sunVec, sunVec);
+    light.wi = sunVec * sqrt(light.distanceSqrDiv);
     light.instensity = gSunIntensity;
 
     float3 ambient = DiffuseIBL(surface) + SpecularIBL(surface);

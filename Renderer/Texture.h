@@ -22,12 +22,14 @@ enum eTextureFlags : uint16_t
 //inline uint16_t SetTextureFlags(bool sRGB = false, bool alpha = false, bool isNormalMap = false, bool bumpToNormal = false)
 
 
-class Texture : public GpuResource, public Graphics::CopyContext
+class Texture : public GpuResource, public Graphics::AsyncGraphicsContext
 {
     friend class TextureManager;
 public:
-    Texture(const std::wstring& name = L"Textrue") : mWidth(1), mHeight(1), mDepth(1), mName(name) {}
-    Texture(DescriptorHandle handle) : mWidth(0), mHeight(0), mDepth(0), mDescriptorHandle(handle) {}
+    Texture(const std::wstring& name = L"Textrue") :mIsLoaded(false), mWidth(1), mHeight(1), mDepth(1), mName(name),
+        mfallback(Graphics::kWhiteOpaque2D) {}
+    Texture(DescriptorHandle handle) :mIsLoaded(false), mWidth(0), mHeight(0), mDepth(0), mfallback(Graphics::kWhiteOpaque2D),
+        mDescriptorHandle(handle) {}
 
     // sync way to create!
     void Create2D(size_t rowPitchBytes, size_t width, size_t height, DXGI_FORMAT format, const void* initData);
@@ -42,11 +44,12 @@ public:
     void Reset();
 
     const DescriptorHandle& GetSRV() const { return mDescriptorHandle; }
-    virtual bool isValid() const { return AsyncContext::isValid() && mContextFence != 0; }
+    virtual bool isValid() const { return mIsLoaded && AsyncContext::isValid() && *mContextFence != 0; }
 
     uint32_t GetWidth() const { return mWidth; }
     uint32_t GetHeight() const { return mHeight; }
     uint32_t GetDepth() const { return mDepth; }
+    Graphics::eDefaultTexture GetFallback() const { return mfallback; }
 
     std::wstring mName;
 private:
@@ -55,10 +58,12 @@ private:
     CommandList* InitTextureTask1(CommandList* commandList, std::shared_ptr<std::vector<D3D12_SUBRESOURCE_DATA>> subData,
         std::shared_ptr<std::vector<uint8_t>> initData);
 protected:
+    bool mIsLoaded;
     uint32_t mWidth;
     uint32_t mHeight;
     uint32_t mDepth;
 
+    Graphics::eDefaultTexture mfallback;
     DescriptorHandle mDescriptorHandle;
 };
 
@@ -71,7 +76,7 @@ public:
     ~TextureRef() {}
 
     // Check that this points to a valid texture (which loaded successfully)
-    bool IsValid() const { return mRef->isValid(); }
+    bool IsValid() const { return mRef ? mRef->isValid() : false; }
 
     operator bool() const { return mRef != nullptr; }
 
@@ -82,6 +87,8 @@ public:
     const Texture* Get() const;
 
     const Texture* operator->() const { return Get(); }
+
+    void WaitForValid() const { if (mRef && !IsValid()) const_cast<Texture*>(mRef)->ForceWaitContext(); }
 private:
     const Texture* mRef;
 };
@@ -99,16 +106,17 @@ public:
     TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags);
     TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags,
         Graphics::eDefaultTexture fallback);
-    TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags, 
-        Graphics::eDefaultTexture fallback, DescriptorHandle handle);
     
     std::filesystem::path GetAbsRootPath() const { return std::filesystem::current_path() / mRootPath; }
+
+    bool WaitLoading();
+    bool WaitLoading(const std::filesystem::path& filename);
 private:
     std::filesystem::path mRootPath;
     std::unordered_map<std::filesystem::path, Texture, std::path_hash> mTextures;
+    std::unordered_map<std::filesystem::path, std::future<void>, std::path_hash> mTextureTasks;
 };
 
 #define GET_TEX(filename) TextureManager::GetInstance()->GetTexture(filename)
 #define GET_TEXF(filename, flags) TextureManager::GetInstance()->GetTexture(filename, flags)
 #define GET_TEXFF(filename, flags, fallback) TextureManager::GetInstance()->GetTexture(filename, flags, fallback)
-#define GET_TEXFFD(filename, flags, fallback, handle) TextureManager::GetInstance()->GetTexture(filename, flags, fallback, handle)

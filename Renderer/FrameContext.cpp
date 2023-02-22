@@ -267,6 +267,16 @@ DepthBuffer& FrameContextManager::GetCurrentSceneDepthBuffer()
 	return Graphics::GetSceneDepthBuffer(mCurFrameContextIdx);
 }
 
+DescriptorHandle FrameContextManager::GetCurrentSceneColorBufferSRV()
+{
+	return Graphics::GetSceneColorBufferSRV(mCurFrameContextIdx);
+}
+
+DescriptorHandle FrameContextManager::GetCurrentSceneDepthBufferSRV()
+{
+	return Graphics::GetSceneDepthBufferSRV(mCurFrameContextIdx);;
+}
+
 void FrameContextManager::PushMutiGraphicsTask(const MutiGraphicsCommand& renderTask)
 {
 	GetCurFrameContext()->mGraphicsTask.push_back(std::move(renderTask));

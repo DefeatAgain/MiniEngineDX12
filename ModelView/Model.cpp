@@ -10,17 +10,18 @@ void Model::Render(MeshRenderer& sorter, const Math::AffineTransform& transform,
 
     for (uint32_t i = 0; i < mMesh->subMeshCount; ++i)
     {
-        const SubMesh& mesh = mMesh->subMeshes[i];
+        const SubMesh& subMesh = mMesh->subMeshes[i];
 
-        Math::BoundingSphere sphereLS((const XMFLOAT4*)mesh.bounds);
+        Math::BoundingSphere sphereLS((const XMFLOAT4*)subMesh.bounds);
         Math::BoundingSphere sphereWS = Math::BoundingSphere(transform * sphereLS.GetCenter(),
             sphereWS.GetRadius() * transform.GetUniformScale());
         Math::BoundingSphere sphereVS = Math::BoundingSphere(viewMat * sphereWS.GetCenter(), sphereWS.GetRadius());
 
-        if (frustum.IntersectSphere(sphereVS))
+        //if (frustum.IntersectSphere(sphereVS))
+        //if (subMesh.psoFlags & ePSOFlags::kAlphaTest)
         {
             float distance = -sphereVS.GetCenter().GetZ() - sphereVS.GetRadius();
-            sorter.AddMesh(mesh, this, distance, meshCBV);
+            sorter.AddMesh(subMesh, this, distance, meshCBV);
         }
     }
 }
