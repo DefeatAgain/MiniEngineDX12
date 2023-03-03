@@ -26,6 +26,7 @@ namespace Math
         INLINE explicit Quaternion( const XMMATRIX& matrix ) { m_vec = XMQuaternionRotationMatrix( matrix ); }	
         INLINE explicit Quaternion( FXMVECTOR vec ) { m_vec = vec; }
         INLINE explicit Quaternion( EIdentityTag ) { m_vec = XMQuaternionIdentity(); }
+        INLINE Quaternion(const XMFLOAT4& data) { m_vec = XMLoadFloat4(&data); }
 
         INLINE operator XMVECTOR() const { return m_vec; }
 

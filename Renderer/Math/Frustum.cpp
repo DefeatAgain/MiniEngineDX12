@@ -23,7 +23,8 @@ void Frustum::ConstructPerspectiveFrustum( float HTan, float VTan, float NearCli
     const float FarX = HTan * FarClip;
     const float FarY = VTan * FarClip;
 
-    // Define the frustum corners
+    // Define the frustum corners 
+    // NearClip > 0 && FarClip > 0
     m_FrustumCorners[ kNearLowerLeft  ] = Vector3(-NearX, -NearY, -NearClip);	// Near lower left
     m_FrustumCorners[ kNearUpperLeft  ] = Vector3(-NearX,  NearY, -NearClip);	// Near upper left
     m_FrustumCorners[ kNearLowerRight ] = Vector3( NearX, -NearY, -NearClip);	// Near lower right
@@ -33,6 +34,7 @@ void Frustum::ConstructPerspectiveFrustum( float HTan, float VTan, float NearCli
     m_FrustumCorners[ kFarLowerRight  ] = Vector3(  FarX,  -FarY,  -FarClip);	// Far lower right
     m_FrustumCorners[ kFarUpperRight  ] = Vector3(  FarX,   FarY,  -FarClip);	// Far upper right
 
+    // If we define dx = x2 - x1 and dy = y2 - y1, then the normals are (-dy, dx) and (dy, -dx).
     const float NHx = RecipSqrt( 1.0f + HTan * HTan );
     const float NHz = -NHx * HTan;
     const float NVy = RecipSqrt( 1.0f + VTan * VTan );
@@ -43,13 +45,14 @@ void Frustum::ConstructPerspectiveFrustum( float HTan, float VTan, float NearCli
     m_FrustumPlanes[kFarPlane]		= BoundingPlane( 0.0f, 0.0f,  1.0f,   FarClip );
     m_FrustumPlanes[kLeftPlane]		= BoundingPlane(  NHx, 0.0f,   NHz,      0.0f );
     m_FrustumPlanes[kRightPlane]	= BoundingPlane( -NHx, 0.0f,   NHz,      0.0f );
-    m_FrustumPlanes[kTopPlane]		= BoundingPlane( 0.0f, -NVy,   NVz,      0.0f );
+    m_FrustumPlanes[kTopPlane]	    = BoundingPlane( 0.0f, -NVy,   NVz,      0.0f );
     m_FrustumPlanes[kBottomPlane]	= BoundingPlane( 0.0f,  NVy,   NVz,      0.0f );
 }
 
 void Frustum::ConstructOrthographicFrustum( float Left, float Right, float Top, float Bottom, float Front, float Back )
 {
     // Define the frustum corners
+    // Front > 0 && Back > 0
     m_FrustumCorners[ kNearLowerLeft  ] = Vector3(Left,   Bottom,	-Front);	// Near lower left
     m_FrustumCorners[ kNearUpperLeft  ] = Vector3(Left,   Top,		-Front);	// Near upper left
     m_FrustumCorners[ kNearLowerRight ] = Vector3(Right,  Bottom,	-Front);	// Near lower right
@@ -60,12 +63,12 @@ void Frustum::ConstructOrthographicFrustum( float Left, float Right, float Top, 
     m_FrustumCorners[ kFarUpperRight  ] = Vector3(Right,  Top,		 -Back);	// Far upper right
 
     // Define the bounding planes
-    m_FrustumPlanes[kNearPlane]		= BoundingPlane(  0.0f,  0.0f, -1.0f, -Front );
-    m_FrustumPlanes[kFarPlane]		= BoundingPlane(  0.0f,  0.0f,  1.0f,   Back );
-    m_FrustumPlanes[kLeftPlane]		= BoundingPlane(  1.0f,  0.0f,  0.0f,  -Left );
-    m_FrustumPlanes[kRightPlane]	= BoundingPlane( -1.0f,  0.0f,  0.0f,  Right );
-    m_FrustumPlanes[kTopPlane]		= BoundingPlane(  0.0f, -1.0f,  0.0f, Bottom );
-    m_FrustumPlanes[kBottomPlane]	= BoundingPlane(  0.0f,  1.0f,  0.0f,   -Top );
+    m_FrustumPlanes[kNearPlane]		= BoundingPlane(  0.0f,  0.0f, -1.0f,  -Front );
+    m_FrustumPlanes[kFarPlane]		= BoundingPlane(  0.0f,  0.0f,  1.0f,    Back );
+    m_FrustumPlanes[kLeftPlane]		= BoundingPlane(  1.0f,  0.0f,  0.0f,   -Left );
+    m_FrustumPlanes[kRightPlane]	= BoundingPlane( -1.0f,  0.0f,  0.0f,   Right );
+    m_FrustumPlanes[kTopPlane]		= BoundingPlane(  0.0f, -1.0f,  0.0f,     Top );
+    m_FrustumPlanes[kBottomPlane]	= BoundingPlane(  0.0f,  1.0f,  0.0f, -Bottom );
 }
 
 
@@ -81,18 +84,18 @@ Frustum::Frustum( const Matrix4& ProjMat )
     if (ProjMatF[3] == 0.0f && ProjMatF[7] == 0.0f && ProjMatF[11] == 0.0f && ProjMatF[15] == 1.0f)
     {
         // Orthographic
-        float Left	 = (-1.0f - ProjMatF[12]) * RcpXX;
-        float Right	 = ( 1.0f - ProjMatF[12]) * RcpXX;
-        float Top	 = ( 1.0f - ProjMatF[13]) * RcpYY;
-        float Bottom = (-1.0f - ProjMatF[13]) * RcpYY;
-        float Front	 = ( 0.0f - ProjMatF[14]) * RcpZZ;
-        float Back   = ( 1.0f - ProjMatF[14]) * RcpZZ;
+        float Left	 = (-1.0f - ProjMatF[12]) * RcpXX; //  l
+        float Right	 = ( 1.0f - ProjMatF[12]) * RcpXX; //  r
+        float Top	 = ( 1.0f - ProjMatF[13]) * RcpYY; //  t
+        float Bottom = (-1.0f - ProjMatF[13]) * RcpYY; //  b
+        float Front	 = ( 0.0f + ProjMatF[14]) * RcpZZ; //  n
+        float Back   = (-1.0f + ProjMatF[14]) * RcpZZ; //  f
 
         // Check for reverse Z here.  The bounding planes need to point into the frustum.
         if (Front < Back)
-            ConstructOrthographicFrustum( Left, Right, Top, Bottom, Front, Back );
+            ConstructOrthographicFrustum(Left, Right, Top, Bottom, Front, Back);
         else
-            ConstructOrthographicFrustum( Left, Right, Top, Bottom, Back, Front );
+            ConstructOrthographicFrustum(Left, Right, Top, Bottom, Back, Front);
     }
     else
     {

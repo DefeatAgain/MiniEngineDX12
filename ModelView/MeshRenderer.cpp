@@ -29,7 +29,7 @@ namespace ModelRenderer
 
             SamplerDesc CubeMapSamplerDesc = DefaultSamplerDesc;
 
-            sForwardRootSig = GET_RSO(L"MeshRenderer RSO");
+            sForwardRootSig = GET_RSO(L"MeshRendererForward RSO");
             sForwardRootSig->Reset(kNumRootBindings, 3);
             sForwardRootSig->InitStaticSampler(10, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
             sForwardRootSig->InitStaticSampler(11, Graphics::SamplerShadowDesc, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -49,9 +49,9 @@ namespace ModelRenderer
             ADD_SHADER("SkyBoxVS", L"MeshRender/SkyBoxVS.hlsl", kVS);
             ADD_SHADER("SkyBoxPS", L"MeshRender/SkyBoxPS.hlsl", kPS);
             ADD_SHADER("ForwardVS", L"MeshRender/ForwardVS.hlsl", kVS);
+            ADD_SHADER("ForwardPS", L"MeshRender/ForwardPS.hlsl", kPS, { "REVERSED_Z", "" });
             ADD_SHADER("ForwardVSNoSecondUV", L"MeshRender/ForwardVS.hlsl", kVS, { "NO_SECOND_UV", "" });
-            ADD_SHADER("ForwardPS", L"MeshRender/ForwardPS.hlsl", kPS);
-            ADD_SHADER("ForwardPSNoSecondUV", L"MeshRender/ForwardPS.hlsl", kPS, { "NO_SECOND_UV", "" });
+            ADD_SHADER("ForwardPSNoSecondUV", L"MeshRender/ForwardPS.hlsl", kPS, { "NO_SECOND_UV", "", "REVERSED_Z", "" });
             ADD_SHADER("DepthOnlyVS", L"MeshRender/DepthOnlyVS.hlsl", kVS);
             ADD_SHADER("DepthOnlyPS", L"MeshRender/DepthOnlyPS.hlsl", kPS);
             ADD_SHADER("DepthOnlyVSCutOff", L"MeshRender/DepthOnlyVS.hlsl", kVS, { "ENABLE_ALPHATEST", "" });
@@ -258,7 +258,7 @@ void MeshRenderer::AddMesh(const SubMesh& subMesh, const Model* model, float dis
         mPassCounts[kOpaque]++;
     }*/
 
-    SortObject object = { model, meshCBV };
+    SortObject object = { model, &subMesh, meshCBV };
     mSortObjects.push_back(object);
 }
 
@@ -332,31 +332,26 @@ void MeshRenderer::RenderMeshes(GraphicsCommandList& context, GlobalConstants& g
         {
             SortKey key = mSortKeys[mCurrentDraw];
             const SortObject& object = mSortObjects[key.objectIdx];
-            const Mesh& mesh = *object.model->mMesh;
+            const Mesh& mesh = *object.model->GetMesh();
+            const SubMesh& subMesh = *object.subMesh;
+            const Material& material = *GET_MATERIAL(subMesh.materialIdx);
 
-            context.SetConstantBuffer(ModelRenderer::kMeshConstants, object.meshCBV);
             context.SetPipelineState(*ModelRenderer::sAllPSOs[key.psoIdx]);
+            context.SetConstantBuffer(ModelRenderer::kMeshConstants, object.meshCBV);
+            context.SetConstantBuffer(ModelRenderer::kMaterialConstants, GET_MAT_VPTR(subMesh.materialIdx));
+            context.SetDescriptorTable(ModelRenderer::kModelTextures, material.GetTextureGpuHandles());
+            context.SetDescriptorTable(ModelRenderer::kModelTextureSamplers, material.GetSamplerGpuHandles());
+            context.SetDescriptorTable(ModelRenderer::kSceneTextures, mScene->GetSceneTextureHandles());
 
-            for (uint32_t i = 0; i < mesh.subMeshCount; ++i)
-            {
-                const SubMesh& subMesh = mesh.subMeshes[i];
-                const Material& material = *GET_MATERIAL(subMesh.materialIdx);
+            if (mCurrentPass == kZPass)
+                context.SetVertexBuffer(0, { GET_MESH_DepthVB + mesh.vbDepthOffset, mesh.sizeDepthVB, mesh.depthVertexStride });
+            else
+                context.SetVertexBuffer(0, { GET_MESH_VB + mesh.vbOffset, mesh.sizeVB, mesh.vertexStride });
 
-                context.SetConstantBuffer(ModelRenderer::kMaterialConstants, GET_MAT_VPTR(subMesh.materialIdx));
-                context.SetDescriptorTable(ModelRenderer::kModelTextures, material.GetTextureGpuHandles());
-                context.SetDescriptorTable(ModelRenderer::kModelTextureSamplers, material.GetSamplerGpuHandles());
-                context.SetDescriptorTable(ModelRenderer::kSceneTextures, mScene->GetSceneTextureHandles());
+            DXGI_FORMAT indexFormat = subMesh.index32 ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
+            context.SetIndexBuffer({ GET_MESH_IB + mesh.ibOffset, mesh.sizeIB, indexFormat });
 
-                if (mCurrentPass == kZPass)
-                    context.SetVertexBuffer(0, { GET_MESH_DepthVB + mesh.vbDepthOffset, mesh.sizeDepthVB, mesh.depthVertexStride });
-                else
-                    context.SetVertexBuffer(0, { GET_MESH_VB + mesh.vbOffset, mesh.sizeVB, mesh.vertexStride });
-
-                DXGI_FORMAT indexFormat = subMesh.index32 ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
-                context.SetIndexBuffer({ GET_MESH_IB + mesh.ibOffset, mesh.sizeIB, indexFormat });
-
-                context.DrawIndexed(subMesh.indexCount, subMesh.startIndex, subMesh.baseVertex);
-            }
+            context.DrawIndexed(subMesh.indexCount, subMesh.startIndex, subMesh.baseVertex);
 
             ++mCurrentDraw;
         }

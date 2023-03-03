@@ -44,6 +44,7 @@ namespace Graphics
     bool IsDeviceAMD(ID3D12Device* pDevice);
     bool IsDeviceIntel(ID3D12Device* pDevice);
 
+    extern bool gApplicationInited;
     extern HWND ghWnd;
     extern Microsoft::WRL::ComPtr<ID3D12Device> gDevice;
 

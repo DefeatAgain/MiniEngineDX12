@@ -197,6 +197,8 @@ namespace Math
         INLINE Vector3 GetTranslation() const { return m_translation; }
         INLINE const Matrix3& GetBasis() const { return (const Matrix3&)*this; }
         INLINE Scalar GetUniformScale() const;
+        INLINE Vector3 GetScale() const;
+        INLINE Quaternion GetRotation() const;
 
         static INLINE AffineTransform MakeXRotation( float angle ) { return AffineTransform(Matrix3::MakeXRotation(angle)); }
         static INLINE AffineTransform MakeYRotation( float angle ) { return AffineTransform(Matrix3::MakeYRotation(angle)); }
@@ -217,9 +219,27 @@ namespace Math
 
     INLINE Scalar AffineTransform::GetUniformScale() const
     {
-        Scalar scaleXSqr = Scalar(XMVector3LengthSq((Vector3)m_basis.GetX()));
-        Scalar scaleYSqr = Scalar(XMVector3LengthSq((Vector3)m_basis.GetY()));
-        Scalar scaleZSqr = Scalar(XMVector3LengthSq((Vector3)m_basis.GetZ()));
+        Scalar scaleXSqr = Scalar(XMVector3LengthSq(m_basis.GetX()));
+        Scalar scaleYSqr = Scalar(XMVector3LengthSq(m_basis.GetY()));
+        Scalar scaleZSqr = Scalar(XMVector3LengthSq(m_basis.GetZ()));
         return Scalar(XMVectorSqrt(XMVectorMax(XMVectorMax(scaleXSqr, scaleYSqr), scaleZSqr)));
+    }
+
+    INLINE Vector3 AffineTransform::GetScale() const
+    {
+        Scalar scaleXSqr = Scalar(XMVector3LengthSq(m_basis.GetX()));
+        Scalar scaleYSqr = Scalar(XMVector3LengthSq(m_basis.GetY()));
+        Scalar scaleZSqr = Scalar(XMVector3LengthSq(m_basis.GetZ()));
+        return Scalar(XMVectorSqrt(Vector3(scaleXSqr, scaleYSqr, scaleZSqr)));
+    }
+
+    INLINE Quaternion AffineTransform::GetRotation() const
+    {
+        Vector3 scaleDiv = Vector3(XMVectorReciprocal(GetScale()));
+        Vector3 X = m_basis.GetX() * scaleDiv.GetX();
+        Vector3 Y = m_basis.GetY() * scaleDiv.GetY();
+        Vector3 Z = m_basis.GetZ() * scaleDiv.GetZ();
+        Matrix3 rotMat(X, Y, Z);
+        return Quaternion(rotMat);
     }
 }

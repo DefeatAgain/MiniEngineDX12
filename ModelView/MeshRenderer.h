@@ -116,6 +116,7 @@ private:
     struct SortObject
     {
         const Model* model;
+        const SubMesh* subMesh;
         D3D12_GPU_VIRTUAL_ADDRESS meshCBV;
     };
 

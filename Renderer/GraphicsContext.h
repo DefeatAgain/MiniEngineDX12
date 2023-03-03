@@ -142,11 +142,9 @@ namespace Graphics
         friend struct std::default_delete<MutiGraphicsContext>;
     public:
         MutiGraphicsContext() {}
-        ~MutiGraphicsContext() {}
+        virtual ~MutiGraphicsContext() {}
     protected:
         virtual void Initialize() = 0;
-
-        virtual void Update(float deltaTime) {}
 
         virtual void BeginRender() {}
         virtual void Render() = 0;

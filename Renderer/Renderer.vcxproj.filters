@@ -65,6 +65,12 @@
     <ClCompile Include="Utils\DirectXMesh\DirectXMeshVBReader.cpp" />
     <ClCompile Include="Utils\DirectXMesh\DirectXMeshVBWriter.cpp" />
     <ClCompile Include="Utils\DirectXMesh\DirectXMeshWeldVertices.cpp" />
+    <ClCompile Include="ImGui\imgui_draw.cpp" />
+    <ClCompile Include="ImGui\imgui_tables.cpp" />
+    <ClCompile Include="ImGui\imgui_widgets.cpp" />
+    <ClCompile Include="ImGui\imgui_demo.cpp" />
+    <ClCompile Include="ImGui\imgui.cpp" />
+    <ClCompile Include="ImGui\imgui_backend.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
@@ -127,6 +133,14 @@
     <ClInclude Include="Utils\DirectXMesh\DirectXMesh.h" />
     <ClInclude Include="Utils\DirectXMesh\DirectXMeshP.h" />
     <ClInclude Include="Utils\DirectXMesh\scoped.h" />
+    <ClInclude Include="ImGui\imconfig.h" />
+    <ClInclude Include="ImGui\imgui.h" />
+    <ClInclude Include="ImGui\imgui_internal.h" />
+    <ClInclude Include="ImGui\imstb_rectpack.h" />
+    <ClInclude Include="ImGui\imstb_textedit.h" />
+    <ClInclude Include="ImGui\imstb_truetype.h" />
+    <ClInclude Include="ImGui\imgui_backend.h" />
+    <ClInclude Include="Fonts\CousineRegular.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Math\Functions.inl" />

@@ -37,6 +37,7 @@ namespace Utility
 namespace Graphics
 {
     bool DebugZoom = false;
+    bool gApplicationInited = false;
 
     eResolution gDisplayResolution = k720p;
     eResolution gRenderResolution = k720p;
@@ -444,7 +445,7 @@ namespace Graphics
         CommandLineArgs::GetInteger(L"debug", useDebugLayers);
 #if _DEBUG
         // Default to true for debug builds
-        useDebugLayers = 0;
+        useDebugLayers = 1;
 #endif
 
         DWORD dxgiFactoryFlags = 0;

@@ -10,6 +10,19 @@
 
 class CameraController;
 class GraphicsCommandList;
+namespace glTF
+{
+    struct Node;
+}
+
+enum SceneTextureHandles
+{
+    kRadianceIBLTexture,
+    kIrradianceIBLTexture,
+    kPreComputeGGXBRDFTexture,
+    kSunShadowTexture,
+    kNumRootBindings
+};
 
 class Scene : public Graphics::MutiGraphicsContext
 {
@@ -23,29 +36,30 @@ public:
 
     void Startup();
 
-    virtual void Update(float deltaTime) override;
+    void Update(float deltaTime);
 
     virtual void Render() override;
 
     void SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL);
-
     void SetIBLBias(float LODBias) { mSpecularIBLBias = LODBias; }
-
     void SetIBLRange(float range) { mSpecularIBLRange = range; }
 
-    void SetModels(std::vector<Model>&& modelMoved) { mModels = std::move(modelMoved); }
+    void ResizeModels(size_t numModels) { mModels.resize(numModels);  }
+    void WalkGraph(const std::vector<glTF::Node*>& siblings, uint32_t curIndex, const Math::Matrix4& xform);
 
-    std::vector<Model>& GetModels() { return mModels; }
-    std::vector<Math::AffineTransform>& GetModelTranforms() { return mModelTransform; }
+    const Model& GetModel(size_t index) const { return mModels[index]; }
+    const Math::AffineTransform& GetModelTranform(size_t index) const { return mModelWorldTransform[index]; }
 
     float GetIBLBias() const { return mSpecularIBLBias; }
     float GetIBLRange() const { return mSpecularIBLRange; }
 
     DescriptorHandle GetSceneTextureHandles() const { return mSceneTextureGpuHandle; }
-
-    void UpdateModels();
 private:
+    void UpdateModels();
     void MapGpuDescriptors();
+    void MapShadowDescriptors();
+    
+    void UpdateModelConstantBuffer();
 
     void UpdateModelBoundingSphere();
 
@@ -60,11 +74,11 @@ private:
     Vector3 mSunLightIntensity;
 
 	std::vector<Model> mModels;
-	std::vector<Math::AffineTransform> mModelTransform;
+	std::vector<Math::AffineTransform> mModelWorldTransform;
     GlobalConstants mGlobalConstants;
-    UploadBuffer mMeshConstantsUploader;
-    Math::BoundingSphere mSceneBoundingSphere;
-    bool mDirtyModels;
+    UploadBuffer mMeshConstantsUploader[SWAP_CHAIN_BUFFER_COUNT];
+    Math::BoundingSphere mSceneBS_WS;
+    size_t mModelDirtyFrameCount;
 
     TextureRef mRadianceCubeMap;
     TextureRef mIrradianceCubeMap;

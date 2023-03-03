@@ -79,7 +79,6 @@ public:
     { 
         kBaseColor, 
         kMetallicRoughness, 
-        kOcclusion, 
         kEmissive,
         kNormal, 
         kNumTextures 

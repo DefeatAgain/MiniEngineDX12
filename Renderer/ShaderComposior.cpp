@@ -79,7 +79,7 @@ const ShaderUnit& ShaderCompositor::AddShader(const std::string& shaderName,
 	auto insertIter = mShaders.emplace(std::piecewise_construct,
 										std::forward_as_tuple(shaderName),
 										std::forward_as_tuple(filename, defaultDefines, type));
-
+	//CompileShader(realPath, insertIter.first->second);
 	mTaskQueue.emplace(Utility::gThreadPoolExecutor.Submit(
 		&ShaderCompositor::CompileShader, this, realPath, std::ref(insertIter.first->second)));
 
@@ -106,7 +106,7 @@ void ShaderCompositor::CompileShader(std::filesystem::path realPath, ShaderUnit&
 ShaderUnit::ShaderUnit(const std::filesystem::path& filename, const std::vector<const char*>& defaultDefines, eShaderType type) :
 	mType(type), mBlob(nullptr), mFilename(filename)
 {
-	for (size_t i = 0; i + 1 < defaultDefines.size(); i++)
+	for (size_t i = 0; i < defaultDefines.size(); i+=2)
 		mShaderMacros[defaultDefines[i]] = defaultDefines[i + 1];
 }
 

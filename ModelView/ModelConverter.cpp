@@ -24,8 +24,6 @@ static uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
         return kSRGB | kDefaultBC | kGenerateMipMaps | (alpha ? kPreserveAlpha : 0);
     case PBRMaterial::kMetallicRoughness:
         return kNoneTextureFlag;
-    case PBRMaterial::kOcclusion:
-        return kNoneTextureFlag;
     case PBRMaterial::kEmissive:
         return kSRGB;
     case PBRMaterial::kNormal: // Use BC5 Compression
@@ -327,7 +325,7 @@ namespace ModelConverter
             // Local space bounds
             Vector3 sphereCenterLS = (Vector3(*(XMFLOAT3*)primitive.minPos) + Vector3(*(XMFLOAT3*)primitive.maxPos)) * 0.5f;
             Scalar maxRadiusLSSq(kZero);
-            AxisAlignedBox aabbLS = AxisAlignedBox(kZero);
+            AxisAlignedBox aabbLS(kZero);
 
             for (uint32_t v = 0; v < vertexCount/*maxIndex*/; ++v)
             {
@@ -339,7 +337,7 @@ namespace ModelConverter
             }
 
             XMStoreFloat3((XMFLOAT3*)subMesh.bounds, sphereCenterLS);
-            subMesh.bounds[3] = maxRadiusLSSq;
+            subMesh.bounds[3] = Sqrt(maxRadiusLSSq);
             XMStoreFloat3(&subMesh.minPos, aabbLS.GetMin());
             XMStoreFloat3(&subMesh.maxPos, aabbLS.GetMax());
         }
@@ -601,7 +599,7 @@ namespace ModelConverter
             GeometryData& geoData = allGeoData.emplace_back(BuildSubMesh(
                 gltfMesh.primitives[pi], mesh.subMeshes[pi], (ePSOFlags) meshflags));
 
-            Utility::PrintMessage("%d %d", mesh.depthVertexStride, geoData.depthVertexStride);
+            //Utility::PrintMessage("%d %d", mesh.depthVertexStride, geoData.depthVertexStride);
             ASSERT(mesh.vertexStride == 0 || mesh.vertexStride == geoData.vertexStride);
             ASSERT(mesh.depthVertexStride == 0 || mesh.depthVertexStride == geoData.depthVertexStride);
             mesh.vertexStride = geoData.vertexStride;
@@ -666,84 +664,12 @@ namespace ModelConverter
         MeshManager::GetInstance()->UpdateMeshes();
     }
 
-    void WalkGraph(
-        std::vector<Model>& sceneModels,
-        const std::vector<glTF::Node*>& siblings,
-        uint32_t curIndex,
-        const Math::Matrix4& xform
-    )
-    {
-        using namespace Math;
-
-        size_t numSiblings = siblings.size();
-        for (size_t i = 0; i < numSiblings; ++i)
-        {
-            glTF::Node* curNode = siblings[i];
-            Model& model = sceneModels[curNode->linearIdx];
-            model.mHasChildren = false;
-            model.mCurIndex = curNode->linearIdx;
-            model.mParentIndex = curIndex;
-            
-            Math::Matrix4 modelXForm;
-            if (curNode->hasMatrix)
-            {
-                CopyMemory((float*)&modelXForm, curNode->matrix, sizeof(curNode->matrix));
-            }
-            else
-            {
-                Quaternion rot;
-                XMFLOAT3 scale;
-                CopyMemory((float*)&rot, curNode->rotation, sizeof(curNode->rotation));
-                CopyMemory((float*)&scale, curNode->scale, sizeof(curNode->scale));
-                modelXForm = Matrix4(
-                    Matrix3(rot) * Matrix3::MakeScale(scale),
-                    Vector3(*(const XMFLOAT3*)curNode->translation)
-                );
-            }
-            const AffineTransform& affineTrans = (const AffineTransform&)modelXForm;
-            Math::Quaternion q(modelXForm);
-            Math::UniformTransform localTrans(q, affineTrans.GetUniformScale(), affineTrans.GetTranslation());
-            model.mLocalTrans = localTrans;
-
-            const Matrix4 LocalXform = xform * modelXForm;
-
-            if (!curNode->pointsToCamera && curNode->mesh != nullptr)
-            {
-                model.mMesh = GET_MESH(curNode->mesh->index);
-
-                Scalar scaleXSqr = LengthSquare((Vector3)LocalXform.GetX());
-                Scalar scaleYSqr = LengthSquare((Vector3)LocalXform.GetY());
-                Scalar scaleZSqr = LengthSquare((Vector3)LocalXform.GetZ());
-                Scalar sphereScale = Sqrt(Max(Max(scaleXSqr, scaleYSqr), scaleZSqr));
-
-                Vector3 sphereCenter(*(Math::XMFLOAT3*)model.mMesh->bounds);
-                sphereCenter = (Vector3)(LocalXform * sphereCenter);
-                Scalar sphereRadius = sphereScale * model.mMesh->bounds[3];
-                model.m_BSOS = Math::BoundingSphere(sphereCenter, sphereRadius);
-                model.m_BBoxOS = AxisAlignedBox::CreateFromSphere(model.m_BSOS);
-            }
-
-            if (curNode->children.size() > 0)
-            {
-                model.mHasChildren = true;
-                WalkGraph(sceneModels, curNode->children, model.mCurIndex, LocalXform);
-            }
-
-            // Are there more siblings?
-            if (i + 1 < numSiblings)
-            {
-                model.mHasSiblings = true;
-            }
-        }
-    }
-
     void BuildScene(Scene* scene, const glTF::Asset& asset)
     {
-        scene->GetModels().resize(asset.m_nodes.size());
-        scene->GetModelTranforms().resize(asset.m_nodes.size());
+        scene->ResizeModels(asset.m_nodes.size());
 
         const glTF::Scene* gltfScene = asset.m_scene; 
         // only one scene
-        WalkGraph(scene->GetModels(), gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
+        scene->WalkGraph(gltfScene->nodes, -1, Math::Matrix4(Math::kIdentity));
     }
 };

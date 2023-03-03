@@ -29,11 +29,11 @@ struct VSOutput
     float3 positionWorld : POSITION;
     float3 normalWorld : NORMAL;
     float4 tangetWorld : TANGENT;
+    float3 shadowCoord : POSITION1;
     float2 uv0 : TEXCOORD0;
 #ifdef SECOND_UV
     float2 uv1 : TEXCOORD1;
 #endif
-    float2 shadowCoord : TEXCOORD2;
 };
 
 
@@ -45,7 +45,7 @@ VSOutput main(VSInput vsInput)
     vsOutput.positionSV = mul(gViewProjMatrix, float4(vsOutput.positionWorld, 1.0));
     vsOutput.normalWorld = mul(gWorldITMatrix, vsInput.normal * 2.0 - 1.0);
     vsOutput.tangetWorld = float4(mul(gWorldITMatrix, vsInput.tanget.xyz * 2.0 - 1.0), vsInput.tanget.w);
-    vsOutput.shadowCoord = mul(gShadowFinalMatrix, float4(vsOutput.positionWorld, 1.0)).xy;
+    vsOutput.shadowCoord = mul(gShadowFinalMatrix, float4(vsOutput.positionWorld, 1.0)).xyz;
     vsOutput.uv0 = vsInput.uv0;
 #ifdef SECOND_UV
     vsOutput.uv1 = vsInput.uv1;

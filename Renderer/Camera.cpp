@@ -16,6 +16,11 @@
 
 using namespace Math;
 
+namespace Graphics
+{
+    bool gReversedZ = true;
+}
+
 void BaseCamera::SetLookDirection(Vector3 forward, Vector3 up)
 {
     // Given, but ensure normalization
@@ -51,7 +56,7 @@ void BaseCamera::Update()
 void Camera::UpdateProjMatrix(void)
 {
     float Y = 1.0f / std::tanf(m_VerticalFOV * 0.5f);
-    float X = Y * m_AspectRatio;
+    float X = Y / m_AspectRatio;
 
     float Q1, Q2;
 
@@ -59,7 +64,8 @@ void Camera::UpdateProjMatrix(void)
     // actually a great idea with F32 depth buffers to redistribute precision more evenly across
     // the entire range.  It requires clearing Z to 0.0f and using a GREATER variant depth test.
     // Some care must also be done to properly reconstruct linear W in a pixel shader from hyperbolic Z.
-    if (m_ReverseZ)
+    //if (m_ReverseZ)
+    if (Graphics::gReversedZ)
     {
         if (m_InfiniteZ)
         {
@@ -96,14 +102,23 @@ void Camera::UpdateProjMatrix(void)
 
 void ShadowCamera::UpdateMatrix(Math::Vector3 LightDirection, Math::Vector3 ShadowCenter, Math::Vector3 ShadowBounds)
 {
-    SetLookDirection(LightDirection, Vector3(kZUnitVector));
+    SetLookDirection(LightDirection, Vector3(kYUnitVector));
 
     // Converts world units to texel units so we can quantize the camera position to whole texel units
     Vector3 RcpDimensions = Recip(ShadowBounds);
 
-    SetPosition(ShadowCenter);
+    SetPosition(ShadowCenter - LightDirection * ShadowBounds.GetZ() * 0.5f);
 
-    SetProjMatrix(Matrix4::MakeScale(Vector3(2.0f, 2.0f, 1.0f) * RcpDimensions));
+    if (Graphics::gReversedZ)
+    {
+        Matrix4 projMat = Matrix4::MakeScale(Vector3(2.0f, 2.0f, 1.0f) * RcpDimensions);
+        projMat.SetW(Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+        SetProjMatrix(projMat);
+    }
+    else
+    {
+        SetProjMatrix(Matrix4::MakeScale(Vector3(2.0f, 2.0f, -1.0f) * RcpDimensions));
+    }
 
     Update();
 

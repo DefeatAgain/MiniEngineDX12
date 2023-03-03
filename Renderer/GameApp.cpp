@@ -14,6 +14,8 @@
 #include "PostEffect.h"
 #include "Utils/CommandLineArg.h"
 #include "Utils/DebugUtils.h"
+#include "ImGui/imgui_backend.h"
+#include "ImGui/imgui.h"
 
 #include <shellapi.h>
 
@@ -23,7 +25,7 @@ namespace GameApp
 
     LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
-    void DrawUI();
+    void DrawInternalUI();
 
     void InitializeApplication(IGameApp& game)
     {
@@ -43,6 +45,7 @@ namespace GameApp
         REGISTER_CONTEXT(PostEffect, Graphics::gRenderWidth, Graphics::gRenderHeight);
         // TextContext As built-in context
         TextRenderer::gTextContext = REGISTER_CONTEXT(TextContext, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
+        ImGuiRenderer::gImguiContext = REGISTER_CONTEXT(ImGuiBackend);
 
         Graphics::InitializeResource();
 
@@ -68,10 +71,11 @@ namespace GameApp
 
         CommandQueueManager::GetInstance()->SelectQueueEvent();
 
-        game.Update(deltaTime);
-        GameInput::Update(deltaTime);
+        ImGuiRenderer::gImguiContext->Update(deltaTime);
 
-        DrawUI();
+        game.Update(deltaTime);
+        GameInput::LateUpdate(deltaTime);
+        DrawInternalUI();
 
         FrameContextManager* frameContextMgr = FrameContextManager::GetInstance();
         frameContextMgr->BeginRender();
@@ -130,6 +134,8 @@ namespace GameApp
         std::filesystem::current_path(std::filesystem::current_path() / L"..\\");
         InitializeApplication(*gameApp);
 
+        Graphics::gApplicationInited = true;
+
         ShowWindow(Graphics::ghWnd, nCmdShow/*SW_SHOWDEFAULT*/);
 
         while (true)
@@ -179,7 +185,7 @@ namespace GameApp
         DescriptorAllocatorManager::RemoveInstance();
     }
 
-    void DrawUI()
+    void DrawInternalUI()
     {
         ZoneScoped;
 

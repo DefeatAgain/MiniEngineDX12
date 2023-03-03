@@ -1,18 +1,17 @@
 #include "ForwardRS.hlsli"
 #include "../Constants.hlsli"
 #include "PBRUtility.hlsli"
+#include "ShadowUtility.hlsli"
 
 Texture2D<float4> baseColorTexture          : register(t0);
 Texture2D<float3> metallicRoughnessTexture  : register(t1);
-Texture2D<float1> occlusionTexture          : register(t2);
-Texture2D<float3> emissiveTexture           : register(t3);
-Texture2D<float3> normalTexture             : register(t4);
+Texture2D<float3> emissiveTexture           : register(t2);
+Texture2D<float3> normalTexture             : register(t3);
 
 SamplerState baseColorSampler               : register(s0);
 SamplerState metallicRoughnessSampler       : register(s1);
-SamplerState occlusionSampler               : register(s2);
-SamplerState emissiveSampler                : register(s3);
-SamplerState normalSampler                  : register(s4);
+SamplerState emissiveSampler                : register(s2);
+SamplerState normalSampler                  : register(s3);
 
 TextureCube<float3> radianceIBLTexture      : register(t10);
 TextureCube<float3> irradianceIBLTexture    : register(t11);
@@ -46,17 +45,16 @@ struct PSIutput
     float3 positionWorld : POSITION;
     float3 normalWorld : NORMAL;
     float4 tangetWorld : TANGENT;
+    float3 shadowCoord : POSITION1;
     float2 uv0 : TEXCOORD0;
 #ifndef NO_SECOND_UV
     float2 uv1 : TEXCOORD1;
 #endif
-    float2 shadowCoord : TEXCOORD2;
 };
 
 // MaterialFlag helpers
-static const uint BASECOLOR_FLAG = 0x0;
-static const uint METALLICROUGHNESS_FLAG = 0x01;
-static const uint OCCLUSION_FLAG = 0x02;
+static const uint BASECOLOR_FLAG = 0x01;
+static const uint METALLICROUGHNESS_FLAG = 0x02;
 static const uint EMISSIVE_FLAG = 0x04;
 static const uint NORMAL_FLAG = 0x08;
 
@@ -121,9 +119,9 @@ float4 main(PSIutput psInput) : SV_Target
 #endif
 
     float4 baseColor = gBaseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR_FLAG));
-    float2 metallicRoughness = gMetallicRoughnessFactor * 
-        metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS_FLAG)).bg;
-    float occlusion = occlusionTexture.Sample(occlusionSampler, UVSET(OCCLUSION_FLAG));
+    float3 occlusionMetallicRoughness = metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS_FLAG)).rgb;
+    float2 metallicRoughness = gMetallicRoughnessFactor * occlusionMetallicRoughness.bg;
+    float occlusion = occlusionMetallicRoughness.r;
     float3 emissive = gEmissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE_FLAG));
     float3 normal = ComputeNormal(normalTexture, normalSampler, UVSET(NORMAL_FLAG), 
         psInput.normalWorld, psInput.tangetWorld, gNormalTextureScale);
@@ -136,13 +134,14 @@ float4 main(PSIutput psInput) : SV_Target
     surface.roughness = metallicRoughness.y;
 
     LightProperties light;
-    float3 sunVec = gSunDirection - psInput.positionWorld;
-    light.distanceSqrDiv = 1.0 / dot(sunVec, sunVec);
-    light.wi = sunVec * sqrt(light.distanceSqrDiv);
+    light.distanceSqrDiv = 1.0;
+    light.wi = gSunDirection;
     light.instensity = gSunIntensity;
 
     float3 ambient = DiffuseIBL(surface) + SpecularIBL(surface);
     float3 sunLight = GGXMicrofacet(light, surface);
+    float3 Li = ambient + ( sunLight) * CalcDirectionShadow(sunShadowTexture, shadowSamplerPoint,  
+        psInput.shadowCoord, 0.001);
 
-    return float4(ambient + sunLight, baseColor.a);
+    return float4(Li, baseColor.a);
 }

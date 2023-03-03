@@ -83,15 +83,14 @@ namespace glTF
             uint32_t flags;
             struct
             {
-                uint32_t baseColorUV : 2;
-                uint32_t metallicRoughnessUV : 2;
-                uint32_t occlusionUV : 2;
-                uint32_t emissiveUV : 2;
-                uint32_t normalUV : 2;
+                uint32_t baseColorUV : 1;
+                uint32_t metallicRoughnessUV : 1;
+                uint32_t emissiveUV : 1;
+                uint32_t normalUV : 1;
                 uint32_t twoSided : 1;
                 uint32_t alphaTest : 1;
                 uint32_t alphaBlend : 1;
-                uint32_t _pad : 3;
+                uint32_t _pad : 9;
                 uint32_t alphaCutoff : 16; // FP16
             };
         };
@@ -100,7 +99,7 @@ namespace glTF
         float roughnessFactor; // default=1
         float emissiveFactor[3]; // default=[0,0,0]
         float normalTextureScale; // default=1
-        enum { kBaseColor, kMetallicRoughness, kOcclusion, kEmissive, kNormal, kNumTextures };
+        enum { kBaseColor, kMetallicRoughness, kEmissive, kNormal, kNumTextures };
         Texture* textures[kNumTextures];
         uint32_t index;
 

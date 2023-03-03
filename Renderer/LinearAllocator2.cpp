@@ -7,21 +7,37 @@ AllocSpan LinearAllocator::Allocate(size_t size, size_t alignment)
 {
     // Align the allocation
     alignment = std::max<size_t>(alignment, 2);
+
+    // Assert that it's a power of two.
+    ASSERT(((alignment - 1) & alignment) == 0);
+
     const size_t alignedSize = Math::AlignUp(size, alignment);
 
     if (alignedSize > mPerPageSize)
         return AllocateLargePage(alignedSize);
 
-    if (!mCurrentPage || mPerPageSize - mCurrentPage->mOffset < alignedSize)
+    if (!mCurrentPage)
     {
         mCurrentPage = &AllocNewPage();
     }
+    else
+    {
+        mCurrentPage->mOffset = Math::AlignUp(mCurrentPage->mOffset, alignment);
+        if (mPerPageSize - mCurrentPage->mOffset < alignedSize)
+        {
+            mCurrentPage = &AllocNewPage();
+        }
+    }
 
-    AllocSpan ret(*mCurrentPage);
-    ret.mCpuAddress = (uint8_t*)mCurrentPage->mStart + mCurrentPage->mOffset;
-    ret.mGpuAddress = mCurrentPage->mGpuVirtualAddress + mCurrentPage->mOffset;
-    ret.mOffset = mCurrentPage->mOffset;
-    ret.mSize = alignedSize;
+    AllocSpan ret(*mCurrentPage, 
+        (uint8_t*)mCurrentPage->mStart + mCurrentPage->mOffset, 
+        mCurrentPage->mGpuVirtualAddress + mCurrentPage->mOffset,
+        alignedSize, 
+        mCurrentPage->mOffset);
+    //ret.mCpuAddress = (uint8_t*)mCurrentPage->mStart + mCurrentPage->mOffset;
+    //ret.mGpuAddress = mCurrentPage->mGpuVirtualAddress + mCurrentPage->mOffset;
+    //ret.mOffset = mCurrentPage->mOffset;
+    //ret.mSize = alignedSize;
 
     mCurrentPage->mOffset += alignedSize;
 
@@ -62,6 +78,7 @@ LinearAllocationPage& LinearAllocator::AllocNewPage(size_t size)
     if (size == 0 && !mUnusedPages.empty())
     {
         mPages.splice(mPages.end(), mUnusedPages, mUnusedPages.begin());
+        ASSERT(mPages.back().mOffset == 0);
         return mPages.back();
     }
 
@@ -85,14 +102,14 @@ LinearAllocationPage& LinearAllocator::AllocNewPage(size_t size)
     if (mType == kGpuExclusive)
     {
         heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-        resourceDesc.Width = size == 0 ? kGpuAllocatorPageSize : size;
+        resourceDesc.Width = size == 0 ? mPerPageSize : size;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         defaultUsage = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
     else
     {
         heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        resourceDesc.Width = size == 0 ? kCpuAllocatorPageSize : size;
+        resourceDesc.Width = size == 0 ? mPerPageSize : size;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
         defaultUsage = D3D12_RESOURCE_STATE_GENERIC_READ;
     }
@@ -108,5 +125,5 @@ LinearAllocationPage& LinearAllocator::AllocNewPage(size_t size)
 AllocSpan LinearAllocator::AllocateLargePage(size_t size)
 {
     LinearAllocationPage& newPage = AllocNewPage(size);
-    return AllocSpan(newPage, newPage.mStart, size, newPage.mGpuVirtualAddress);
+    return AllocSpan(newPage, newPage.mStart, newPage.mGpuVirtualAddress, size, 0);
 }

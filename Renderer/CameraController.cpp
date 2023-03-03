@@ -14,6 +14,7 @@
 #include "CameraController.h"
 #include "Camera.h"
 #include "GameInput.h"
+#include "Utils/DebugUtils.h"
 
 using namespace Math;
 
@@ -57,6 +58,7 @@ void FlyingFPSCamera::Update(float deltaTime)
 
     float timeScale = Graphics::DebugZoom == 0 ? 1.0f : Graphics::DebugZoom == 1 ? 0.5f : 0.25f;
 
+    //Utility::PrintMessage("%d", GameInput::IsFirstPressed(VK_SHIFT));
     if (GameInput::IsFirstPressed(VK_SHIFT))
         m_FineMovement = !m_FineMovement;
 
@@ -93,6 +95,7 @@ void FlyingFPSCamera::Update(float deltaTime)
     // don't apply momentum to mouse inputs
     float yaw = GameInput::GetMouseInputX() * deltaTime * m_MouseSensitivityX;
     float pitch = GameInput::GetMouseInputY() * deltaTime * m_MouseSensitivityY;
+    //Utility::PrintMessage(L"%d %d", GameInput::GetMouseInputX(), 1);
 
     m_CurrentPitch += pitch;
     m_CurrentPitch = XMMin(XM_PIDIV2, m_CurrentPitch);

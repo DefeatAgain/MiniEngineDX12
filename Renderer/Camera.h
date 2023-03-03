@@ -16,6 +16,11 @@
 #include "Math/VectorMath.h"
 #include "Math/Frustum.h"
 
+namespace Graphics
+{
+    extern bool gReversedZ;
+}
+
 namespace Math
 {
     class BaseCamera
@@ -91,18 +96,18 @@ namespace Math
         Camera();
 
         // Controls the view-to-projection matrix
-        void SetPerspectiveMatrix(float verticalFovRadians, float aspectHeightOverWidth, float nearZClip, float farZClip);
+        void SetPerspectiveMatrix(float verticalFovRadians, float aspectWidthOverHeight, float nearZClip, float farZClip);
         void SetFOV(float verticalFovInRadians) { m_VerticalFOV = verticalFovInRadians; UpdateProjMatrix(); }
         void SetAspectRatio(float heightOverWidth) { m_AspectRatio = heightOverWidth; UpdateProjMatrix(); }
         void SetZRange(float nearZ, float farZ) { m_NearClip = nearZ; m_FarClip = farZ; UpdateProjMatrix(); }
-        void ReverseZ(bool enable) { m_ReverseZ = enable; UpdateProjMatrix(); }
+        //void ReverseZ(bool enable) { m_ReverseZ = enable; UpdateProjMatrix(); }
 
         float GetFOV() const { return m_VerticalFOV; }
         float GetNearClip() const { return m_NearClip; }
         float GetFarClip() const { return m_FarClip; }
-        float GetClearDepth() const { return m_ReverseZ ? 0.0f : 1.0f; }
+        float GetClearDepth() const { return Graphics::gReversedZ ? 0.0f : 1.0f; }
 
-    private:
+    protected:
 
         void UpdateProjMatrix(void);
 
@@ -110,7 +115,7 @@ namespace Math
         float m_AspectRatio;
         float m_NearClip;
         float m_FarClip;
-        bool m_ReverseZ;		// Invert near and far clip distances so that Z=1 at the near plane
+        //bool m_ReverseZ;		// Invert near and far clip distances so that Z=1 at the near plane
         bool m_InfiniteZ;       // Move the far plane to infinity
     };
 
@@ -138,15 +143,15 @@ namespace Math
         m_Basis = Matrix3(m_CameraToWorld.GetRotation());
     }
 
-    inline Camera::Camera() : m_ReverseZ(true), m_InfiniteZ(false)
+    inline Camera::Camera() : /*m_ReverseZ(true),*/ m_InfiniteZ(false)
     {
-        SetPerspectiveMatrix(XM_PIDIV4, 9.0f / 16.0f, 1.0f, 1000.0f);
+        SetPerspectiveMatrix(XM_PIDIV4, 16.0f / 9.0f, 1.0f, 1000.0f);
     }
 
-    inline void Camera::SetPerspectiveMatrix(float verticalFovRadians, float aspectHeightOverWidth, float nearZClip, float farZClip)
+    inline void Camera::SetPerspectiveMatrix(float verticalFovRadians, float aspectWidthOverHeight, float nearZClip, float farZClip)
     {
         m_VerticalFOV = verticalFovRadians;
-        m_AspectRatio = aspectHeightOverWidth;
+        m_AspectRatio = aspectWidthOverHeight;
         m_NearClip = nearZClip;
         m_FarClip = farZClip;
 

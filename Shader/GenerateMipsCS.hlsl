@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-// 这个实现在 https://www.3dgep.com/learning-directx-12-4/ 中有具体的讲解而且代码几乎一样
+// read this https://www.3dgep.com/learning-directx-12-4/
 
 #include "CommonRS.hlsli"
 #include "Utility.hlsli"

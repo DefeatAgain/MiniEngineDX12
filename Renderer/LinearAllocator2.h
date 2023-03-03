@@ -27,23 +27,24 @@ class AllocSpan
 private:
     AllocSpan(LinearAllocationPage& page,
         void* ptr,
+        D3D12_GPU_VIRTUAL_ADDRESS gpuAddress,
         size_t size,
-        D3D12_GPU_VIRTUAL_ADDRESS gpuAddress)
-        : mPage(page), mCpuAddress(ptr), mSize(size), mOffset(0), mGpuAddress(gpuAddress)
+        size_t offset)
+        : mPage(page), mCpuAddress(ptr), mGpuAddress(gpuAddress), mSize(size), mOffset(offset)
     {}
 
     AllocSpan(LinearAllocationPage& page)
-        : AllocSpan(page, nullptr, 0, D3D12_VIRTUAL_ADDRESS_NULL)
+        : AllocSpan(page, nullptr, D3D12_VIRTUAL_ADDRESS_NULL, 0, 0)
     {}
 private:
+    LinearAllocationPage& mPage;
     void* mCpuAddress;			             // The CPU-writeable address
     D3D12_GPU_VIRTUAL_ADDRESS mGpuAddress;	// The GPU-visible address
     size_t mSize;
     size_t mOffset;
-    LinearAllocationPage& mPage;
 };
 
-class LinearAllocationPage : public GpuResource
+class LinearAllocationPage : public GpuResource, NonCopyable
 {
     friend class LinearAllocator;
     friend struct std::less<LinearAllocationPage>;

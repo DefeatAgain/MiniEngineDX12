@@ -20,6 +20,13 @@ using namespace Graphics;
 using namespace Math;
 using namespace std;
 
+namespace
+{
+    RootSignature* sRootSignature;
+    GraphicsPipelineState* sTextPSO;
+    GraphicsPipelineState* sShadowPSO;
+}
+
 namespace TextRenderer
 {
     class Font
@@ -171,10 +178,6 @@ namespace TextRenderer
         LoadedFonts[filename].reset(newFont);
         return newFont;
     }
-
-    RootSignature* sRootSignature;
-    GraphicsPipelineState* sTextPSO;
-    GraphicsPipelineState* sShadowPSO;
 } // namespace TextRenderer
 
 void TextRenderer::Initialize(void)
@@ -294,7 +297,7 @@ void TextContext::EnableDropShadow(bool enable, CommandList& commandList)
 
     m_EnableShadow = enable;
 
-    commandList.SetPipelineState(m_EnableShadow ? TextRenderer::sShadowPSO[m_HDR] : TextRenderer::sTextPSO[m_HDR]);
+    commandList.SetPipelineState(m_EnableShadow ? sShadowPSO[m_HDR] : sTextPSO[m_HDR]);
 }
 
 void TextContext::SetShadowOffset(float xPercent, float yPercent)
@@ -404,7 +407,7 @@ CommandList* TextContext::RenderTask(CommandList* commandList, BOOL enableHDR)
     graphicsCL.ExceptResourceBeginState(swapChain, D3D12_RESOURCE_STATE_RENDER_TARGET);
     graphicsCL.SetViewportAndScissor(0, 0, swapChain.GetWidth(), swapChain.GetHeight());
     graphicsCL.SetRenderTarget(swapChain.GetRTV());
-    graphicsCL.SetPipelineState(*TextRenderer::sTextPSO);
+    graphicsCL.SetPipelineState(*sTextPSO);
     graphicsCL.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
     // render

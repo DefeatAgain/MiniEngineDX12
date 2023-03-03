@@ -386,10 +386,6 @@ void glTF::Asset::ProcessMaterials( json& materials )
         if (thisMaterial.HasMember("emissiveFactor"))
             ReadFloats(thisMaterial["emissiveFactor"], material.emissiveFactor);
 
-        if (thisMaterial.HasMember("occlusionTexture"))
-            material.occlusionUV = ReadTextureInfo(thisMaterial["occlusionTexture"],
-                material.textures[Material::kOcclusion]);
-
         if (thisMaterial.HasMember("emissiveTexture"))
             material.emissiveUV = ReadTextureInfo(thisMaterial["emissiveTexture"],
                 material.textures[Material::kEmissive]);

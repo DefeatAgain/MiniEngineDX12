@@ -27,6 +27,7 @@ class TextContext : public Graphics::MutiGraphicsContext
 {
 public:
     TextContext(float CanvasWidth = 1920.0f, float CanvasHeight = 1080.0f);
+    ~TextContext() {}
 
     // Put settings back to the defaults.
     void ResetSettings(void);
