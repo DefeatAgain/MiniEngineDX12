@@ -68,20 +68,27 @@ void ShaderCompositor::InitAllShaders()
 const ShaderUnit& ShaderCompositor::AddShader(const std::string& shaderName,
 	const std::filesystem::path& filename,
 	eShaderType type,
-	const std::vector<const char*>& defaultDefines)
+	const std::vector<std::string>& defaultDefines)
 {
 	WARN_IF_NOT(sShaderCompositorInited, L"Async Load Shader is False!");
 
 	std::filesystem::path realPath(GetFinalRootPath() / filename);
 	ASSERT(std::filesystem::exists(realPath));
-	ASSERT(mShaders.find(shaderName) == mShaders.end());
+
+	auto iter = mShaders.find(shaderName);
+	if (mShaders.find(shaderName) != mShaders.end())
+		return iter->second;
 	
 	auto insertIter = mShaders.emplace(std::piecewise_construct,
 										std::forward_as_tuple(shaderName),
 										std::forward_as_tuple(filename, defaultDefines, type));
+
 	//CompileShader(realPath, insertIter.first->second);
-	mTaskQueue.emplace(Utility::gThreadPoolExecutor.Submit(
-		&ShaderCompositor::CompileShader, this, realPath, std::ref(insertIter.first->second)));
+	if (!sShaderCompositorInited)
+		mTaskQueue.emplace(Utility::gThreadPoolExecutor.Submit(
+			&ShaderCompositor::CompileShader, this, realPath, std::ref(insertIter.first->second)));
+	else
+		CompileShader(realPath, insertIter.first->second);
 
 	return insertIter.first->second;
 }
@@ -103,7 +110,7 @@ void ShaderCompositor::CompileShader(std::filesystem::path realPath, ShaderUnit&
 
 
 // -- ShaderUnit --
-ShaderUnit::ShaderUnit(const std::filesystem::path& filename, const std::vector<const char*>& defaultDefines, eShaderType type) :
+ShaderUnit::ShaderUnit(const std::filesystem::path& filename, const std::vector<std::string>& defaultDefines, eShaderType type) :
 	mType(type), mBlob(nullptr), mFilename(filename)
 {
 	for (size_t i = 0; i < defaultDefines.size(); i+=2)

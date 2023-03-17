@@ -16,8 +16,7 @@ public:
     Model() {}
 	~Model() {}
 
-    void Render(MeshRenderer& renderer, const Math::AffineTransform& transform,
-        D3D12_GPU_VIRTUAL_ADDRESS meshCBV) const;
+    void Render(MeshRenderer& renderer, const Math::AffineTransform& transform, D3D12_GPU_VIRTUAL_ADDRESS meshCBV) const;
 
     const Mesh* GetMesh() const { return mMesh; }
     Math::BoundingSphere GetWorldBoundingSphere() const;

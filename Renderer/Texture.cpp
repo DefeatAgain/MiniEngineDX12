@@ -190,7 +190,6 @@ namespace
         HRESULT hr = SaveToDDSFile(image->GetImages(), image->GetImageCount(), image->GetMetadata(), DDS_FLAGS_NONE, newPath.c_str());
         if (FAILED(hr))
         {
-            ASSERT(false);
             Utility::PrintMessage("Could not write texture to file \"%ws\" (%08X).\n", newPath.generic_string().c_str(), hr);
             return false;
         }

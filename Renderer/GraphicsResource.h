@@ -28,7 +28,8 @@ namespace Graphics
 
     extern SamplerDesc SamplerLinearWrapDesc;
     extern SamplerDesc SamplerAnisoWrapDesc;
-    extern SamplerDesc SamplerShadowDesc;
+    extern SamplerDesc SamplerShadowDescGE;
+    extern SamplerDesc SamplerShadowDescLE;
     extern SamplerDesc SamplerLinearClampDesc;
     extern SamplerDesc SamplerVolumeWrapDesc;
     extern SamplerDesc SamplerPointClampDesc;
@@ -37,7 +38,8 @@ namespace Graphics
 
     extern DescriptorHandle SamplerLinearWrap;
     extern DescriptorHandle SamplerAnisoWrap;
-    extern DescriptorHandle SamplerShadow;
+    extern DescriptorHandle SamplerShadowGE;
+    extern DescriptorHandle SamplerShadowLE;
     extern DescriptorHandle SamplerLinearClamp;
     extern DescriptorHandle SamplerVolumeWrap;
     extern DescriptorHandle SamplerPointClamp;
@@ -71,4 +73,6 @@ namespace Graphics
 
     extern ComputePipelineState* gGenerateMipsLinearPSO[];
     extern ComputePipelineState* gGenerateMipsSRGBPSO[];
+    extern ComputePipelineState* gDepthResloveMsaaPSO;
+    extern ComputePipelineState* gDepthArrayResloveMsaaPSO;
 }

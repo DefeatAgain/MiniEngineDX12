@@ -708,25 +708,25 @@ void GraphicsCommandList::ClearColor(ColorBuffer& target, float color[4], D3D12_
     mCommandList->ClearRenderTargetView(target.GetRTV(), color, (rect == nullptr) ? 0 : 1, rect);
 }
 
-void GraphicsCommandList::ClearDepth(DepthBuffer& target)
+void GraphicsCommandList::ClearDepth(DepthBuffer& target, UINT arraySlice)
 {
     FlushResourceBarriers();
     mCommandList->ClearDepthStencilView(
-        target.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
+        target.GetDSV(arraySlice), D3D12_CLEAR_FLAG_DEPTH, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
 }
 
-void GraphicsCommandList::ClearStencil(DepthBuffer& target)
+void GraphicsCommandList::ClearStencil(DepthBuffer& target, UINT arraySlice)
 {
     FlushResourceBarriers();
     mCommandList->ClearDepthStencilView(
-        target.GetDSV(), D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
+        target.GetDSV(arraySlice), D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
 }
 
-void GraphicsCommandList::ClearDepthAndStencil(DepthBuffer& target)
+void GraphicsCommandList::ClearDepthAndStencil(DepthBuffer& target, UINT arraySlice)
 {
     FlushResourceBarriers();
     mCommandList->ClearDepthStencilView(
-        target.GetDSV(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
+        target.GetDSV(arraySlice), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, target.GetClearDepth(), target.GetClearStencil(), 0, nullptr);
 }
 
 void GraphicsCommandList::BeginQuery(ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT heapIndex)
@@ -983,4 +983,12 @@ void GraphicsCommandList::DrawIndexedInstanced(
     FlushResourceBarriers();
     mCommandList->DrawIndexedInstanced(
         indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+}
+
+void GraphicsCommandList::ResolveMSAAResource(GpuResource& dest, GpuResource& src, DXGI_FORMAT destFormat)
+{
+    TransitionResource(dest, D3D12_RESOURCE_STATE_RESOLVE_DEST);
+    TransitionResource(src, D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
+    FlushResourceBarriers();
+    mCommandList->ResolveSubresource(dest.GetResource(), 0, src.GetResource(), 0, destFormat);
 }

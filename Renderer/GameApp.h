@@ -25,9 +25,9 @@ namespace GameApp
 	void DestroySingleton();
 }
 
-#define CREATE_APPLICATION( app_class ) \
+#define CREATE_APPLICATION( app_class, app_name ) \
     int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstance*/, _In_ LPWSTR /*lpCmdLine*/, _In_ int nCmdShow) \
     { \
 		auto appInst = app_class(); \
-        return GameApp::RunApplication( &appInst, L#app_class, hInstance, nCmdShow ); \
+        return GameApp::RunApplication( &appInst, L#app_name, hInstance, nCmdShow ); \
     }

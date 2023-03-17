@@ -35,6 +35,8 @@ namespace Math
 
         BoundingSphere Union( const BoundingSphere& rhs );
 
+        bool Contains(Vector3 point);
+
     private:
 
         Vector4 m_repr;

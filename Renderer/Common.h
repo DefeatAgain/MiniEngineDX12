@@ -19,6 +19,16 @@ private:
 	NonCopyable& operator=(const NonCopyable&) = delete;
 };
 
+
+template< typename T >
+struct array_deleter
+{
+    void operator ()(T const* p)
+    {
+        delete[] p;
+    }
+};
+
 template<typename T>
 std::enable_if_t<!std::is_lvalue_reference_v<T>, T*> 
 inline make_rvalue_ptr(T&& v) { return &v; }

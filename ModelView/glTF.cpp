@@ -264,6 +264,8 @@ void glTF::Asset::ProcessMeshes( json& meshes, json& accessors )
 
             if (thisPrim.HasMember("material"))
                 prim.material = &m_materials[thisPrim["material"].GetUint()];
+            else // must have material
+                prim.material = &m_materials[m_materials.size() - 1];
         }
     }
 }

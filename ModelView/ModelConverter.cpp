@@ -23,11 +23,11 @@ static uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
     case PBRMaterial::kBaseColor:
         return kSRGB | kDefaultBC | kGenerateMipMaps | (alpha ? kPreserveAlpha : 0);
     case PBRMaterial::kMetallicRoughness:
-        return kNoneTextureFlag;
+        return kGenerateMipMaps | kDefaultBC;
     case PBRMaterial::kEmissive:
-        return kSRGB;
+        return kSRGB | kDefaultBC | kGenerateMipMaps;
     case PBRMaterial::kNormal: // Use BC5 Compression
-        return kDefaultBC | kNormalMap;
+        return kDefaultBC | kNormalMap | kGenerateMipMaps;
     default:
         return kNoneTextureFlag;
     }
@@ -479,7 +479,6 @@ namespace ModelConverter
 
         VBWriter dvbw;
         dvbw.Initialize(depthLayout);
-        MemoryBarrier;
         ComputeInputLayout(depthLayout, offsets, strides);
         uint32_t depthStride = strides[0];
 
@@ -509,7 +508,8 @@ namespace ModelConverter
     {
         Mesh mesh;
         mesh.subMeshes = std::make_unique<SubMesh[]>(gltfMesh.primitives.size());
-        mesh.subMeshCount = gltfMesh.primitives.size();
+        ASSERT(gltfMesh.primitives.size() < 65536);
+        mesh.subMeshCount = (uint16_t)gltfMesh.primitives.size();
 
         /*
         //std::vector<std::future<GeometryData>> futureGeoData;

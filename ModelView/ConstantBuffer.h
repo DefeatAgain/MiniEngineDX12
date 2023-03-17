@@ -2,6 +2,10 @@
 #include <cstdint>
 #include "Math/VectorMath.h"
 
+#define MAX_CSM_DIVIDES 3
+
+
+__declspec(align(256)) 
 struct ModelConstants
 {
     Math::Matrix4 World;         // Object to world
@@ -43,10 +47,13 @@ struct PBRMaterialConstants
 struct GlobalConstants
 {
     Math::Matrix4 ViewProjMatrix;
-    Math::Matrix4 SunShadowMatrix;
+    Math::Matrix4 SunShadowMatrix[MAX_CSM_DIVIDES + 1];
+    Math::Vector3 CSMDivides;
     Math::Vector3 CameraPos;
     Math::Vector3 SunDirection;
     Math::Vector3 SunIntensity;
     float IBLRange;
-    float IBLBias;
+    float ShadowBias;
+    float gNearZ;
+    float gFarZ;
 };

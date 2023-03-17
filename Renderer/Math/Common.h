@@ -40,6 +40,20 @@ namespace Math
         return AlignDownWithMask(value, alignment - 1);
     }
 
+    template <typename T> __forceinline T AlignUpToPower2(T value)
+    {
+        T n = value;
+        value--;
+        value |= value >> 1;
+        value |= value >> 2;
+        value |= value >> 4;
+        value |= value >> 8;
+        value |= value >> 16;
+        value++;
+        T x = value >> 1; // previous power of 2
+        return T((value - n) > (n - x) ? x : value);
+    }
+
     template <typename T> __forceinline bool IsAligned( T value, size_t alignment )
     {
         return 0 == ((size_t)value & (alignment - 1));

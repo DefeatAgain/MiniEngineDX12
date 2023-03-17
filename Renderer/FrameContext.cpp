@@ -46,11 +46,11 @@ void FrameContext::RecordGraphicsTask()
 		if (mCurRecordType == -1)
 			mQueueProduce = &queue;
 
-		else if (renderTaskType != mCurRecordType)
-		{
-			Flush(queue, true);
-			queue.StallForProducer(*mQueueProduce);
-		}
+		//else if (renderTaskType != mCurRecordType)
+		//{
+		//	Flush(queue, true);
+		//	queue.StallForProducer(*mQueueProduce);
+		//}
 
 		mCurRecordType = renderTaskType;
 		mQueueProduce = &queue;
@@ -213,6 +213,8 @@ void FrameContext::PrepareRevealBufferEnd(CommandList& ghCommandList)
 // -- FrameContextManager --
 void FrameContextManager::InitFrameContexts()
 {
+	mCurFrameContextIdx = 0;
+
 	for (size_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
 	{
 		mFrameContexts.emplace_back(new FrameContext);

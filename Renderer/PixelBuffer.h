@@ -10,7 +10,7 @@ class CommandList;
 class PixelBuffer : public GpuResource, public Graphics::CopyContext
 {
 public:
-    PixelBuffer() : mWidth(0), mHeight(0), mArraySize(0), mNumMipMaps(0), mFormat(DXGI_FORMAT_UNKNOWN) {}
+    PixelBuffer() : mWidth(0), mHeight(0), mArraySize(0), mNumMipMaps(0), mSampleCount(1), mFormat(DXGI_FORMAT_UNKNOWN) {}
 
     uint32_t GetWidth() const { return mWidth; }
     uint32_t GetHeight() const { return mHeight; }
@@ -20,6 +20,14 @@ public:
     // Write the raw pixel buffer contents to a file
     // Note that data is preceded by a 16-byte header:  { DXGI_FORMAT, Pitch (in pixels), width (in pixels), height }
     void ExportToFile(const std::wstring& filePath);
+
+    static DXGI_FORMAT GetBaseFormat(DXGI_FORMAT format);
+    static DXGI_FORMAT GetSRVFormat(DXGI_FORMAT format);
+    static DXGI_FORMAT GetUAVFormat(DXGI_FORMAT format);
+    static DXGI_FORMAT GetDSVFormat(DXGI_FORMAT format);
+    static DXGI_FORMAT GetDepthFormat(DXGI_FORMAT format);
+    static DXGI_FORMAT GetStencilFormat(DXGI_FORMAT format);
+    static size_t BytesPerPixel(DXGI_FORMAT format);
 protected:
     CommandList* ExportToFileTask(CommandList* copyList, ReadbackBuffer& dstBuffer, D3D12_PLACED_SUBRESOURCE_FOOTPRINT& placedFootprint);
 
@@ -29,17 +37,11 @@ protected:
 
     void CreateTextureResource(const std::wstring& name, const D3D12_RESOURCE_DESC& resourceDesc, D3D12_CLEAR_VALUE ClearValue);
 
-    static DXGI_FORMAT GetBaseFormat(DXGI_FORMAT format);
-    static DXGI_FORMAT GetUAVFormat(DXGI_FORMAT format);
-    static DXGI_FORMAT GetDSVFormat(DXGI_FORMAT format);
-    static DXGI_FORMAT GetDepthFormat(DXGI_FORMAT format);
-    static DXGI_FORMAT GetStencilFormat(DXGI_FORMAT format);
-    static size_t BytesPerPixel(DXGI_FORMAT format);
-protected:
     uint32_t mWidth;
     uint32_t mHeight;
     uint32_t mArraySize;
     uint32_t mNumMipMaps; // number of texture sublevels
+    uint32_t mSampleCount;
     DXGI_FORMAT mFormat;
 };
 
@@ -48,7 +50,7 @@ class ColorBuffer : public PixelBuffer
 {
 public:
     ColorBuffer(Color ClearColor = Color(0.0f, 0.0f, 0.0f, 0.0f))
-        : mClearColor(ClearColor), mFragmentCount(1), mSampleCount(1)
+        : mClearColor(ClearColor)
     {}
 
     virtual void Destroy() override;
@@ -65,18 +67,13 @@ public:
         DXGI_FORMAT format);
 
     // Get pre-created CPU-visible descriptor handles
-    const DescriptorHandle& GetSRV() const { return mSRVHandle; }
-    const DescriptorHandle& GetRTV() const { return mRTVHandle; }
-    const DescriptorHandle& GetUAV() const { return mUAVHandle; }
+    DescriptorHandle GetSRV(UINT arrIndex = 0) const { return mSRVHandle + arrIndex; }
+    DescriptorHandle GetRTV(UINT arrIndex = 0) const { return mRTVHandle + arrIndex; }
+    DescriptorHandle GetUAV(UINT arrIndex = 0) const { return mUAVHandle + arrIndex; }
 
     void SetClearColor(Color ClearColor) { mClearColor = ClearColor; }
 
-    void SetMsaaMode(uint32_t numColorSamples, uint32_t numCoverageSamples)
-    {
-        ASSERT(numCoverageSamples >= numColorSamples);
-        mFragmentCount = numColorSamples;
-        mSampleCount = numCoverageSamples;
-    }
+    void SetMsaaMode(uint32_t numCoverageSamples) { mSampleCount = numCoverageSamples; }
 
     Color GetClearColor() const { return mClearColor; }
 
@@ -102,7 +99,7 @@ protected:
     {
         D3D12_RESOURCE_FLAGS Flags = D3D12_RESOURCE_FLAG_NONE;
 
-        if (Flags == D3D12_RESOURCE_FLAG_NONE && mFragmentCount == 1)
+        if (Flags == D3D12_RESOURCE_FLAG_NONE && mSampleCount == 1)
             Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | Flags;
@@ -110,8 +107,6 @@ protected:
 
     void CreateDerivedViews(DXGI_FORMAT format, uint32_t arraySize, uint32_t numMips = 1);
 protected:
-    uint32_t mFragmentCount;
-    uint32_t mSampleCount;
     Color mClearColor;
     DescriptorHandle mSRVHandle;
     DescriptorHandle mRTVHandle;
@@ -132,14 +127,16 @@ public:
     void Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t numMips, DXGI_FORMAT format);
 
     void Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t numSamples, uint32_t numMips, DXGI_FORMAT format);
+    
+    void Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t arraySize, uint32_t numSamples, uint32_t numMips, DXGI_FORMAT format);
 
     // Get pre-created CPU-visible descriptor handles
-    DescriptorHandle GetDSV() const { return mDSV; }
-    DescriptorHandle GetDSV_DepthReadOnly() const { return mDSV + 1; }
-    DescriptorHandle GetDSV_StencilReadOnly() const { ASSERT(mHasStencilView); return mDSV + 2; }
-    DescriptorHandle GetDSV_ReadOnly() const { ASSERT(mHasStencilView); return mDSV + 3; }
-    DescriptorHandle GetDepthSRV() const { return mDepthSRV; }
-    DescriptorHandle GetStencilSRV() const { return mStencilSRV; }
+    DescriptorHandle GetDSV(UINT index = 0) const { return mDSV + index; }
+    DescriptorHandle GetDSV_DepthReadOnly(UINT index = 0) const { return mDSV + (1 + index); }
+    DescriptorHandle GetDSV_StencilReadOnly(UINT index = 0) const { ASSERT(mHasStencilView); return mDSV + (2 + index); }
+    DescriptorHandle GetDSV_ReadOnly(UINT index = 0) const { ASSERT(mHasStencilView); return mDSV + (3 + index); }
+    DescriptorHandle GetDepthSRV(UINT index = 0) const { return mDepthSRV + index; }
+    DescriptorHandle GetStencilSRV(UINT index = 0) const { return mStencilSRV + index; }
 
     float GetClearDepth() const { return mClearDepth; }
     uint8_t GetClearStencil() const { return mClearStencil; }
@@ -159,14 +156,24 @@ class ShadowBuffer : public DepthBuffer
 {
 public:
     ShadowBuffer() {}
+    ~ShadowBuffer() {}
 
-    void Create(const std::wstring& name, uint32_t width, uint32_t height, DXGI_FORMAT dsvFormat = DSV_FORMAT);
+    virtual void Destroy() override;
 
-    DescriptorHandle GetSRV() const { return GetDepthSRV(); }
+    void Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t arraySize = 1, uint32_t numSamples = 1, DXGI_FORMAT dsvFormat = DSV_FORMAT);
+
+    DescriptorHandle GetSRV(UINT arrIndex = 0) const { return GetDepthSRV(arrIndex); }
+
+    void ResolveMsaa(ComputeCommandList& commandList, ColorBuffer& nonMsaaBuffer, uint32_t sampleCount);
 
     void BeginRendering(GraphicsCommandList& commandList);
     void EndRendering(GraphicsCommandList& commandList);
-public:
+
+    const D3D12_VIEWPORT& GetViewPort() const { return mViewport; }
+    const D3D12_RECT& GetScissor() const { return mScissor; }
+private:
     D3D12_VIEWPORT mViewport;
     D3D12_RECT mScissor;
+
+    DescriptorHandle mhandleForResolveMsaa;
 };

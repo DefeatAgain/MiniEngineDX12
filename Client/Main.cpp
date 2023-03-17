@@ -7,9 +7,14 @@
 #include "MeshRenderer.h"
 #include "Texture.h"
 #include "ImGui/imgui.h"
+#include "MainView.h"
 
-static glTF::Asset sAsset;
-static Scene* sScenePtr;
+namespace
+{
+	glTF::Asset sAsset;
+	Scene* sScenePtr;
+}
+
 
 namespace GameApp
 {
@@ -27,7 +32,8 @@ namespace GameApp
 
 	void SceneGameApp::Start()
 	{
-		sAsset.Parse(L"Asset/Sponza2/sponza2.gltf");
+		//sAsset.Parse(L"Asset/Sponza2/sponza2.gltf");
+		sAsset.Parse(L"Asset/CSMTest/CSMTest.gltf");
 
 		ModelConverter::BuildMaterials(sAsset);
 		ModelConverter::BuildAllMeshes(sAsset);
@@ -56,24 +62,8 @@ namespace GameApp
 
 		sScenePtr->Update(deltaTime);
 			
-		static unsigned counter = 0;
 		ImGui::ShowDemoWindow();
-
-		//ImGui::Begin("Hello, world!");
-		//ImGui::Text("This is some useful text.");
-		//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-		//ImGui::Checkbox("Another Window", &show_another_window);
-
-		//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-		//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-		//if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-		//	counter++;
-		//ImGui::SameLine();
-		//ImGui::Text("counter = %d", counter);
-
-		//ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", ImGui::GetIO().DeltaTime, ImGui::GetIO().Framerate);
-		//ImGui::End();
+		MainView::ShowUI(sScenePtr);
 	}
 
 	void SceneGameApp::Cleanup()
@@ -85,4 +75,4 @@ namespace GameApp
 	}
 }
 
-CREATE_APPLICATION(GameApp::SceneGameApp);
+CREATE_APPLICATION(GameApp::SceneGameApp, MiniEngineDX12);

@@ -16,7 +16,11 @@ SamplerState normalSampler                  : register(s3);
 TextureCube<float3> radianceIBLTexture      : register(t10);
 TextureCube<float3> irradianceIBLTexture    : register(t11);
 Texture2D<float2> preComputeBRDFTexture     : register(t12);
-Texture2D<float> sunShadowTexture		    : register(t13);
+#if NUM_CSM_SHADOW_MAP > 1
+Texture2DArray<float> sunShadowTexture		: register(t18);
+#else
+Texture2D<float> sunShadowTexture		    : register(t18);
+#endif
 
 cbuffer MaterialConstants : register(b0)
 {
@@ -30,13 +34,16 @@ cbuffer MaterialConstants : register(b0)
 cbuffer GlobalConstants : register(b1)
 {
     float4x4 gViewProjMatrix;
-    float4x4 gShadowFinalMatrix;
+    float4x4 gShadowFinalMatrix[MAX_CSM_SHADOW_DIVIDES + 1];
+    float3 gCSMDivides;
     float3 gEyePos;
     float3 gSunDirection;
     float3 gSunIntensity;
     float _pad;
     float gIBLRange;
-    float gIBLBias;
+    float gShadowBias;
+    float gNearZ;
+    float gFarZ;
 }
 
 struct PSIutput
@@ -45,9 +52,15 @@ struct PSIutput
     float3 positionWorld : POSITION;
     float3 normalWorld : NORMAL;
     float4 tangetWorld : TANGENT;
-    float3 shadowCoord : POSITION1;
     float2 uv0 : TEXCOORD0;
-#ifndef NO_SECOND_UV
+
+#if NUM_CSM_SHADOW_MAP > 1
+    float3 shadowCoord[NUM_CSM_SHADOW_MAP] : POSITION1;
+#else
+    float3 shadowCoord : POSITION1;
+#endif
+
+#ifdef SECOND_UV
     float2 uv1 : TEXCOORD1;
 #endif
 };
@@ -98,7 +111,7 @@ float3 DiffuseIBL(SurfaceProperties surf)
 
 float3 SpecularIBL(SurfaceProperties surf)
 {
-    float lod = surf.roughness * gIBLRange + gIBLBias;
+    float lod = surf.roughness * gIBLRange;
     float NoV = dot(surf.wo, surf.N);
 
     float3 prefilterLi = radianceIBLTexture.SampleLevel(defaultSampler, reflect(-surf.wo, surf.N), lod).rgb;
@@ -112,11 +125,12 @@ float3 SpecularIBL(SurfaceProperties surf)
 [RootSignature(ForwardRendererRootSig)]
 float4 main(PSIutput psInput) : SV_Target
 {
-#ifdef NO_SECOND_UV
-    #define UVSET(FLAG) psInput.uv0
-#else
+#ifdef SECOND_UV
     #define UVSET(FLAG) lerp(psInput.uv0, psInput.uv1, gMaterialFlags & FLAG)
+#else
+    #define UVSET(FLAG) psInput.uv0
 #endif
+    psInput.normalWorld = normalize(psInput.normalWorld);
 
     float4 baseColor = gBaseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR_FLAG));
     float3 occlusionMetallicRoughness = metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS_FLAG)).rgb;
@@ -140,8 +154,13 @@ float4 main(PSIutput psInput) : SV_Target
 
     float3 ambient = DiffuseIBL(surface) + SpecularIBL(surface);
     float3 sunLight = GGXMicrofacet(light, surface);
-    float3 Li = ambient + ( sunLight) * CalcDirectionShadow(sunShadowTexture, shadowSamplerPoint,  
-        psInput.shadowCoord, 0.001);
-
+#if NUM_CSM_SHADOW_MAP > 1
+    float visiblity = CalcDirectionShadow(sunShadowTexture, shadowSamplerComparison, psInput.shadowCoord, gShadowBias, 
+        psInput.normalWorld, gSunDirection, psInput.positionSV.w, gNearZ, gFarZ, gCSMDivides);
+#else
+     float visiblity = CalcDirectionShadow(sunShadowTexture, shadowSamplerComparison, psInput.shadowCoord, gShadowBias,
+        psInput.normalWorld, gSunDirection);
+#endif
+    float3 Li = ambient + sunLight * visiblity;
     return float4(Li, baseColor.a);
 }

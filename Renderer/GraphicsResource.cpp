@@ -6,7 +6,8 @@ namespace Graphics
 {
     SamplerDesc SamplerLinearWrapDesc;
     SamplerDesc SamplerAnisoWrapDesc;
-    SamplerDesc SamplerShadowDesc;
+    SamplerDesc SamplerShadowDescGE;
+    SamplerDesc SamplerShadowDescLE;
     SamplerDesc SamplerLinearClampDesc;
     SamplerDesc SamplerVolumeWrapDesc;
     SamplerDesc SamplerPointClampDesc;
@@ -15,7 +16,8 @@ namespace Graphics
 
     DescriptorHandle SamplerLinearWrap;
     DescriptorHandle SamplerAnisoWrap;
-    DescriptorHandle SamplerShadow;
+    DescriptorHandle SamplerShadowGE;
+    DescriptorHandle SamplerShadowLE;
     DescriptorHandle SamplerLinearClamp;
     DescriptorHandle SamplerVolumeWrap;
     DescriptorHandle SamplerPointClamp;
@@ -56,6 +58,8 @@ namespace Graphics
 
     ComputePipelineState* gGenerateMipsLinearPSO[4];
     ComputePipelineState* gGenerateMipsSRGBPSO[4];
+    ComputePipelineState* gDepthResloveMsaaPSO;
+    ComputePipelineState* gDepthArrayResloveMsaaPSO;
     RootSignature* gCommonRS;
     
     void InitRootSigAndShader()
@@ -74,12 +78,15 @@ namespace Graphics
         ADD_SHADER("GenMipsLinear", "GenerateMipsCS.hlsl", kCS);
         ADD_SHADER("GenMipsLinearOddX", "GenerateMipsCS.hlsl", kCS, { "NON_POWER_OF_TWO", "1" });
         ADD_SHADER("GenMipsLinearOddY", "GenerateMipsCS.hlsl", kCS, { "NON_POWER_OF_TWO", "2" });
-        ADD_SHADER("GenMipsLinearOddCS", "GenerateMipsCS.hlsl", kCS, { "NON_POWER_OF_TWO", "3" });
+        ADD_SHADER("GenMipsLinearOddXY", "GenerateMipsCS.hlsl", kCS, { "NON_POWER_OF_TWO", "3" });
 
         ADD_SHADER("GenMipsSRGB", "GenerateMipsCS.hlsl", kCS);
         ADD_SHADER("GenMipsSRGBOddX", "GenerateMipsCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "1" });
         ADD_SHADER("GenMipsSRGBOddY", "GenerateMipsCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "2" });
-        ADD_SHADER("GenMipsSRGBOddCS", "GenerateMipsCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "3" });
+        ADD_SHADER("GenMipsSRGBOddXY", "GenerateMipsCS.hlsl", kCS, { "CONVERT_TO_SRGB", "", "NON_POWER_OF_TWO", "3" });
+
+        ADD_SHADER("DepthResolveMsaa", "DepthResolveMsaa.hlsl", kCS);
+        ADD_SHADER("DepthArrayResolveMsaa", "DepthResolveMsaa.hlsl", kCS, { "USE_ARRAY", "" });
 
         // custom
         for (auto& initTask : gCustomRootSigShaderTasks)
@@ -94,11 +101,13 @@ namespace Graphics
         gGenerateMipsLinearPSO[0] = GET_CPSO(L"GenMipsLinear");
         gGenerateMipsLinearPSO[1] = GET_CPSO(L"GenMipsLinearOddX");
         gGenerateMipsLinearPSO[2] = GET_CPSO(L"GenMipsLinearOddY");
-        gGenerateMipsLinearPSO[3] = GET_CPSO(L"GenMipsLinearOddCS");
+        gGenerateMipsLinearPSO[3] = GET_CPSO(L"GenMipsLinearOddXY");
         gGenerateMipsSRGBPSO[0] = GET_CPSO(L"GenMipsSRGB");
         gGenerateMipsSRGBPSO[1] = GET_CPSO(L"GenMipsSRGBOddX");
         gGenerateMipsSRGBPSO[2] = GET_CPSO(L"GenMipsSRGBOddY");
-        gGenerateMipsSRGBPSO[3] = GET_CPSO(L"GenMipsSRGBOddCS");
+        gGenerateMipsSRGBPSO[3] = GET_CPSO(L"GenMipsSRGBOddXY");
+        gDepthResloveMsaaPSO = GET_CPSO(L"DepthResolveMsaa");
+        gDepthArrayResloveMsaaPSO = GET_CPSO(L"DepthArrayResolveMsaa");
 
         for (auto& initTask : gCustomPipeStatTasks)
             initTask();
@@ -112,11 +121,13 @@ namespace Graphics
         CreatePSO(gGenerateMipsLinearPSO[0], GET_SHADER("GenMipsLinear"));
         CreatePSO(gGenerateMipsLinearPSO[1], GET_SHADER("GenMipsLinearOddX"));
         CreatePSO(gGenerateMipsLinearPSO[2], GET_SHADER("GenMipsLinearOddY"));
-        CreatePSO(gGenerateMipsLinearPSO[3], GET_SHADER("GenMipsLinearOddCS"));
+        CreatePSO(gGenerateMipsLinearPSO[3], GET_SHADER("GenMipsLinearOddXY"));
         CreatePSO(gGenerateMipsLinearPSO[0], GET_SHADER("GenMipsSRGB"));
         CreatePSO(gGenerateMipsLinearPSO[1], GET_SHADER("GenMipsSRGBOddX"));
         CreatePSO(gGenerateMipsLinearPSO[2], GET_SHADER("GenMipsSRGBOddY"));
-        CreatePSO(gGenerateMipsLinearPSO[3], GET_SHADER("GenMipsSRGBOddCS"));
+        CreatePSO(gGenerateMipsLinearPSO[3], GET_SHADER("GenMipsSRGBOddXY"));
+        CreatePSO(gDepthResloveMsaaPSO, GET_SHADER("DepthResolveMsaa"));
+        CreatePSO(gDepthArrayResloveMsaaPSO, GET_SHADER("DepthArrayResolveMsaa"));
 #undef CreatePSO
 
         PipeLineStateManager::GetInstance()->InitAllPipeLineStates();
@@ -130,10 +141,15 @@ namespace Graphics
         SamplerAnisoWrapDesc.MaxAnisotropy = 4;
         SamplerAnisoWrap = SamplerAnisoWrapDesc.CreateDescriptor();
 
-        SamplerShadowDesc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
-        SamplerShadowDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-        SamplerShadowDesc.SetTextureAddressMode(D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
-        SamplerShadow = SamplerShadowDesc.CreateDescriptor();
+        SamplerShadowDescGE.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+        SamplerShadowDescGE.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+        SamplerShadowDescGE.SetTextureAddressMode(D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+        SamplerShadowGE = SamplerShadowDescGE.CreateDescriptor();
+
+        SamplerShadowDescLE.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+        SamplerShadowDescLE.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        SamplerShadowDescLE.SetTextureAddressMode(D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+        SamplerShadowLE = SamplerShadowDescLE.CreateDescriptor();
 
         SamplerLinearClampDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
         SamplerLinearClampDesc.SetTextureAddressMode(D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
@@ -292,7 +308,7 @@ namespace Graphics
 
         SamplerLinearWrapDesc.DestroyDescriptor(SamplerLinearWrap);
         SamplerAnisoWrapDesc.DestroyDescriptor(SamplerAnisoWrap);
-        SamplerShadowDesc.DestroyDescriptor(SamplerShadow);
+        SamplerShadowDescGE.DestroyDescriptor(SamplerShadowGE);
         SamplerLinearClampDesc.DestroyDescriptor(SamplerLinearClamp);
         SamplerVolumeWrapDesc.DestroyDescriptor(SamplerVolumeWrap);
         SamplerPointClampDesc.DestroyDescriptor(SamplerPointClamp);

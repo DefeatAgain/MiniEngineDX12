@@ -153,6 +153,42 @@ DXGI_FORMAT PixelBuffer::GetBaseFormat(DXGI_FORMAT format)
     }
 }
 
+DXGI_FORMAT PixelBuffer::GetSRVFormat(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+        // 32-bit Z w/ Stencil
+    case DXGI_FORMAT_R32G8X24_TYPELESS:
+    case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+    case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+    case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+        return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
+
+        // No Stencil
+    case DXGI_FORMAT_R32_TYPELESS:
+    case DXGI_FORMAT_D32_FLOAT:
+    case DXGI_FORMAT_R32_FLOAT:
+        return DXGI_FORMAT_R32_FLOAT;
+
+        // 24-bit Z
+    case DXGI_FORMAT_R24G8_TYPELESS:
+    case DXGI_FORMAT_D24_UNORM_S8_UINT:
+    case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+    case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+        return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+
+        // 16-bit Z w/o Stencil
+    case DXGI_FORMAT_R16_TYPELESS:
+    case DXGI_FORMAT_D16_UNORM:
+    case DXGI_FORMAT_R16_UNORM:
+        return DXGI_FORMAT_R16_UNORM;
+
+    default:
+        ASSERT(false, "undeclared format!!!");
+        return format;
+    }
+}
+
 DXGI_FORMAT PixelBuffer::GetUAVFormat(DXGI_FORMAT format)
 {
     switch (format)
@@ -397,11 +433,11 @@ void ColorBuffer::Destroy()
     PixelBuffer::Destroy();
 
     if (mSRVHandle)
-        DEALLOC_DESCRIPTOR(mSRVHandle, 1);
+        DEALLOC_DESCRIPTOR(mSRVHandle, mArraySize);
     if (mRTVHandle)
-        DEALLOC_DESCRIPTOR(mRTVHandle, 1);
+        DEALLOC_DESCRIPTOR(mRTVHandle, mArraySize);
     if (mUAVHandle)
-        DEALLOC_DESCRIPTOR(mUAVHandle, 1);
+        DEALLOC_DESCRIPTOR(mUAVHandle, mArraySize);
 }
 
 void ColorBuffer::CreateFromSwapChain(const std::wstring& name, ID3D12Resource* baseResource)
@@ -421,7 +457,7 @@ void ColorBuffer::Create(const std::wstring& name, uint32_t width, uint32_t heig
     D3D12_RESOURCE_FLAGS Flags = CombineResourceFlags();
     D3D12_RESOURCE_DESC resourceDesc = DescribeTex2D(width, height, 1, numMips, format, Flags);
 
-    resourceDesc.SampleDesc.Count = mFragmentCount;
+    resourceDesc.SampleDesc.Count = mSampleCount;
     resourceDesc.SampleDesc.Quality = 0;
 
     D3D12_CLEAR_VALUE clearValue{};
@@ -454,7 +490,7 @@ void ColorBuffer::CreateArray(const std::wstring& name, uint32_t width, uint32_t
 void ColorBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t arraySize, uint32_t numMips)
 {
     ASSERT(arraySize == 1 || numMips == 1, "We don't support auto-mips on texture arrays");
-    ASSERT(mFragmentCount == 1 || numMips == 1, "We don't support muti sample mips");
+    ASSERT(mSampleCount == 1 || numMips == 1, "We don't support muti sample mips");
 
     mNumMipMaps =  numMips - 1;
 
@@ -471,21 +507,15 @@ void ColorBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t arraySize, uin
     {
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
         rtvDesc.Texture2DArray.MipSlice = 0;
-        rtvDesc.Texture2DArray.FirstArraySlice = 0;
-        rtvDesc.Texture2DArray.ArraySize = arraySize;
 
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
         srvDesc.Texture2DArray.MipLevels = numMips;
         srvDesc.Texture2DArray.MostDetailedMip = 0;
-        srvDesc.Texture2DArray.FirstArraySlice = 0;
-        srvDesc.Texture2DArray.ArraySize = arraySize;
 
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-        uavDesc.Texture2DArray.ArraySize = arraySize;
-        uavDesc.Texture2DArray.FirstArraySlice = 0;
         uavDesc.Texture2DArray.MipSlice = 0;
     }
-    else if (mFragmentCount > 1)
+    else if (mSampleCount > 1)
     {
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DMS;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
@@ -505,21 +535,46 @@ void ColorBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t arraySize, uin
 
     if (!mSRVHandle)
     {
-        mRTVHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-        mSRVHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        mRTVHandle = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, mArraySize);
+        mSRVHandle = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mArraySize);
+        mUAVHandle = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mArraySize);
     }
-
+        
     ID3D12Resource* resource = mResource.Get();
 
-    // Create the render target view
-    Graphics::gDevice->CreateRenderTargetView(resource, &rtvDesc, mRTVHandle);
-
-    // Create the shader resource view
-    Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mSRVHandle);
-
-    if (!mUAVHandle)
-        mUAVHandle = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    Graphics::gDevice->CreateUnorderedAccessView(resource, nullptr, &uavDesc, mUAVHandle);
+    if (mArraySize == 1)
+    {
+        // Create the render target view
+        Graphics::gDevice->CreateRenderTargetView(resource, &rtvDesc, mRTVHandle);
+        // Create the shader resource view
+        Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mSRVHandle);
+        Graphics::gDevice->CreateUnorderedAccessView(resource, nullptr, &uavDesc, mUAVHandle);
+    }
+    else
+    {
+        for (UINT i = 0; i < mArraySize; i++)
+        {
+            if (mSampleCount == 1)
+            {
+                rtvDesc.Texture2DArray.FirstArraySlice = i;
+                rtvDesc.Texture2DArray.ArraySize = mArraySize - i;
+                srvDesc.Texture2DArray.FirstArraySlice = i;
+                srvDesc.Texture2DArray.ArraySize = mArraySize - i;
+                uavDesc.Texture2DArray.FirstArraySlice = i;
+                uavDesc.Texture2DArray.ArraySize = mArraySize - i;
+            }
+            else
+            {
+                rtvDesc.Texture2DMSArray.FirstArraySlice = i;
+                rtvDesc.Texture2DMSArray.ArraySize = mArraySize - i;
+                srvDesc.Texture2DMSArray.FirstArraySlice = i;
+                srvDesc.Texture2DMSArray.ArraySize = mArraySize - i;
+            }
+            Graphics::gDevice->CreateRenderTargetView(resource, &rtvDesc, mRTVHandle + i);
+            Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mSRVHandle + i);
+            Graphics::gDevice->CreateUnorderedAccessView(resource, nullptr, &uavDesc, mUAVHandle + i);
+        }
+    }
 }
 
 void ColorBuffer::GenerateMipMaps()
@@ -613,11 +668,11 @@ void DepthBuffer::Destroy()
     PixelBuffer::Destroy();
 
     if (mDSV)
-        DEALLOC_DESCRIPTOR(mDSV, mHasStencilView ? 4 : 2);
+        DEALLOC_DESCRIPTOR(mDSV, (mHasStencilView ? 4 : 2) * mArraySize);
     if (mDepthSRV)
-        DEALLOC_DESCRIPTOR(mDepthSRV, 1);
+        DEALLOC_DESCRIPTOR(mDepthSRV, mArraySize);
     if (mStencilSRV)
-        DEALLOC_DESCRIPTOR(mStencilSRV, 1);
+        DEALLOC_DESCRIPTOR(mStencilSRV, mArraySize);
 }
 
 void DepthBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t numMips, DXGI_FORMAT format)
@@ -627,8 +682,13 @@ void DepthBuffer::Create(const std::wstring& name, uint32_t width, uint32_t heig
 
 void DepthBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t numSamples, uint32_t numMips, DXGI_FORMAT format)
 {
-    D3D12_RESOURCE_DESC resourceDesc = DescribeTex2D(width, height, 1, numMips, format, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-    resourceDesc.SampleDesc.Count = numSamples;
+    DepthBuffer::Create(name, width, height, 1, 1, numMips, format);
+}
+
+void DepthBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t arraySize, uint32_t numSamples, uint32_t numMips, DXGI_FORMAT format)
+{
+    D3D12_RESOURCE_DESC resourceDesc = DescribeTex2D(width, height, arraySize, numMips, format, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+    mSampleCount = resourceDesc.SampleDesc.Count = numSamples;
 
     D3D12_CLEAR_VALUE clearValue{};
     clearValue.Format = format;
@@ -644,75 +704,172 @@ void DepthBuffer::CreateDerivedViews(DXGI_FORMAT format, uint32_t numMips)
 
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
     dsvDesc.Format = GetDSVFormat(format);
-    if (resource->GetDesc().SampleDesc.Count == 1)
+    if (mSampleCount == 1)
     {
-        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        dsvDesc.Texture2D.MipSlice = 0;
+        if (mArraySize > 1)
+        {
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+            dsvDesc.Texture2DArray.MipSlice = 0;
+        }
+        else
+        {
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+            dsvDesc.Texture2D.MipSlice = 0;
+        }
     }
     else
     {
-        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMS;
+        if (mArraySize > 1)
+        {
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY;
+        }
+        else
+        {
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMS;
+        }
     }
 
     DXGI_FORMAT stencilReadFormat = GetStencilFormat(format);
     mHasStencilView = stencilReadFormat != DXGI_FORMAT_UNKNOWN;
 
     if (!mDSV)
-        mDSV = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, mHasStencilView ? 4 : 2);
+        mDSV = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, (mHasStencilView ? 4 : 2) * mArraySize);
 
-    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-    Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV);
-
-    dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
-    Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + 1);
-
-    if (stencilReadFormat != DXGI_FORMAT_UNKNOWN)
+    // dsv/dsv read depth/dsv read staencil/dsv read all
+    if (mArraySize == 1)
     {
-        dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_STENCIL;
-        Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + 2);
+        dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+        Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV);
 
-        dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL;
-        Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + 3);
+        dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+        Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + 1);
+
+        if (stencilReadFormat != DXGI_FORMAT_UNKNOWN)
+        {
+            dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+            Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + 2);
+
+            dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+            Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + 3);
+        }
     }
-    //else
-    //{
-    //    mDSV[2] = mDSV[0];
-    //    mDSV[3] = mDSV[1];
-    //}
+    else
+    {
+        for (UINT i = 0; i < mArraySize; i++)
+        {
+            if (mSampleCount == 1)
+            {
+                dsvDesc.Texture2DArray.FirstArraySlice = i;
+                dsvDesc.Texture2DArray.ArraySize = mArraySize - i;
+
+            }
+            else
+            {
+                dsvDesc.Texture2DMSArray.FirstArraySlice = i;
+                dsvDesc.Texture2DMSArray.ArraySize = mArraySize - i;
+            }
+
+            dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+            Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + i);
+
+            dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+            Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + (1 + i));
+
+            if (stencilReadFormat != DXGI_FORMAT_UNKNOWN)
+            {
+                dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+                Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + (2 + i));
+
+                dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+                Graphics::gDevice->CreateDepthStencilView(resource, &dsvDesc, mDSV + (3 + i));
+            }
+        }
+    }
+
 
     if (!mDepthSRV)
-        mDepthSRV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        mDepthSRV = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mArraySize);
 
     // Create the shader resource view
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
     srvDesc.Format = GetDepthFormat(format);
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     if (dsvDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2D)
     {
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Texture2D.MipLevels = numMips;
     }
-    else
+    else if (dsvDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2DMS)
     {
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
     }
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mDepthSRV);
-
-    if (mHasStencilView)
+    else if (dsvDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2DARRAY)
     {
-        if (!mStencilSRV)
-            mStencilSRV = ALLOC_DESCRIPTOR1(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MipLevels = numMips;
+        srvDesc.Texture2DArray.MostDetailedMip = 0;
+        srvDesc.Texture2DArray.PlaneSlice = 0;
+        srvDesc.Texture2DArray.ResourceMinLODClamp = 0;
+    }
+    else
+    {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY;
+    }
 
-        srvDesc.Format = stencilReadFormat;
-        Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mStencilSRV);
+    if (mHasStencilView && !mStencilSRV)
+    {
+        mStencilSRV = ALLOC_DESCRIPTOR(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mArraySize);
+    }
+
+    if (mArraySize == 1)
+    {
+        Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mDepthSRV);
+
+
+        if (mHasStencilView)
+        {
+            srvDesc.Format = stencilReadFormat;
+            Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mStencilSRV);
+        }
+    }
+    else
+    {
+        for (UINT i = 0; i < mArraySize; i++)
+        {
+            if (mSampleCount == 1)
+            {
+                srvDesc.Texture2DArray.FirstArraySlice = i;
+                srvDesc.Texture2DArray.ArraySize = mArraySize - i;
+            }
+            else
+            {
+                srvDesc.Texture2DMSArray.FirstArraySlice = i;
+                srvDesc.Texture2DMSArray.ArraySize = mArraySize - i;
+            }
+
+            Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mDepthSRV + i);
+
+            if (mHasStencilView)
+            {
+                Graphics::gDevice->CreateShaderResourceView(resource, &srvDesc, mStencilSRV + i);
+            }
+        }
     }
 }
 
 
 // -- ShadowBuffer --
-void ShadowBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, DXGI_FORMAT dsvFormat)
+void ShadowBuffer::Destroy()
 {
-    DepthBuffer::Create(name, width, height, 1, dsvFormat);
+    if (mhandleForResolveMsaa)
+        DEALLOC_DESCRIPTOR_GPU(mhandleForResolveMsaa, 2);
+
+    DepthBuffer::Destroy();
+}
+
+void ShadowBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t arraySize, uint32_t numSamples, DXGI_FORMAT dsvFormat)
+{
+    DepthBuffer::Create(name, width, height, arraySize, numSamples, 1, dsvFormat);
 
     mViewport.TopLeftX = 0.0f;
     mViewport.TopLeftY = 0.0f;
@@ -726,6 +883,29 @@ void ShadowBuffer::Create(const std::wstring& name, uint32_t width, uint32_t hei
     mScissor.top = 1;
     mScissor.right = (LONG)width - 2;
     mScissor.bottom = (LONG)height - 2;
+}
+
+void ShadowBuffer::ResolveMsaa(ComputeCommandList& commandList, ColorBuffer& nonMsaaBuffer, uint32_t sampleCount)
+{
+    static std::mutex localMutex;
+    if (!mhandleForResolveMsaa)
+    {
+        std::lock_guard<std::mutex> lockGuard(localMutex);
+        mhandleForResolveMsaa = ALLOC_DESCRIPTOR_GPU(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2);
+        Graphics::gDevice->CopyDescriptorsSimple(1, mhandleForResolveMsaa, GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        Graphics::gDevice->CopyDescriptorsSimple(1, mhandleForResolveMsaa + 1, nonMsaaBuffer.GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    commandList.TransitionResource(*this, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    commandList.TransitionResource(nonMsaaBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    if (mArraySize > 1)
+        commandList.ComputeCommandList::SetPipelineState(*Graphics::gDepthArrayResloveMsaaPSO);
+    else
+        commandList.ComputeCommandList::SetPipelineState(*Graphics::gDepthResloveMsaaPSO);
+    commandList.SetConstants(0, sampleCount, mArraySize);
+    commandList.SetDescriptorTable(1, mhandleForResolveMsaa);
+    commandList.SetDescriptorTable(2, mhandleForResolveMsaa + 1);
+    commandList.Dispatch2D(mWidth, mHeight);
 }
 
 void ShadowBuffer::BeginRendering(GraphicsCommandList& commandList)

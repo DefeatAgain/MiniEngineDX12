@@ -29,12 +29,14 @@ namespace Math
         enum CornerID
         {
             kNearLowerLeft, kNearUpperLeft, kNearLowerRight, kNearUpperRight,
-            kFarLowerLeft,  kFarUpperLeft,  kFarLowerRight,  kFarUpperRight
+            kFarLowerLeft,  kFarUpperLeft,  kFarLowerRight,  kFarUpperRight,
+            kNumConers
         };
 
         enum PlaneID
         {
-            kNearPlane, kFarPlane, kLeftPlane, kRightPlane, kTopPlane, kBottomPlane
+            kNearPlane, kFarPlane, kLeftPlane, kRightPlane, kTopPlane, kBottomPlane,
+            kNumPlanes
         };
 
         Vector3         GetFrustumCorner( CornerID id ) const   { return m_FrustumCorners[id]; }
@@ -48,6 +50,7 @@ namespace Math
         // simple struct in the Model project.)
         bool IntersectBoundingBox(const AxisAlignedBox& aabb) const;
 
+        friend Frustum  operator* ( const Quaternion& rot, const Frustum& frustum );
         friend Frustum  operator* ( const OrthogonalTransform& xform, const Frustum& frustum );	// Fast
         friend Frustum  operator* ( const AffineTransform& xform, const Frustum& frustum );		// Slow
         friend Frustum  operator* ( const Matrix4& xform, const Frustum& frustum );				// Slowest (and most general)
@@ -90,6 +93,19 @@ namespace Math
         }
 
         return true;
+    }
+
+    inline Frustum operator*(const Quaternion& rot, const Frustum& frustum)
+    {
+        Frustum result;
+
+        for (int i = 0; i < 8; ++i)
+            result.m_FrustumCorners[i] = rot * frustum.m_FrustumCorners[i];
+
+        for (int i = 0; i < 6; ++i)
+            result.m_FrustumPlanes[i] = rot * frustum.m_FrustumPlanes[i];
+
+        return result;
     }
 
     inline Frustum operator* ( const OrthogonalTransform& xform, const Frustum& frustum )

@@ -37,3 +37,9 @@ BoundingSphere BoundingSphere::Union( const BoundingSphere& rhs )
 
     return BoundingSphere((extremeA + extremeB) * 0.5f, Length(extremeA - extremeB) * 0.5f);
 }
+
+bool Math::BoundingSphere::Contains(Vector3 point)
+{
+    float dist = Length(point - GetCenter());
+    return float(dist - GetRadius()) < 1e-6 || dist < GetRadius();
+}

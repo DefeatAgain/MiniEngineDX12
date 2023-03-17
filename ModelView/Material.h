@@ -103,8 +103,7 @@ class MaterialManager : public Singleton<MaterialManager>
 {
     USE_SINGLETON;
 private:
-    MaterialManager() : mConstantBufferSize(0), mNumDirtyCount(0)
-    {}
+    MaterialManager() : mConstantBufferSize(0), mNumDirtyCount(0) {}
 public:
     ~MaterialManager() {}
 
@@ -125,6 +124,7 @@ public:
         material.mIsShared = isShared;
         material.mMaterialIdx = mAllMaterials.size() - 1;
         material.mBufferOffset = mConstantBufferSize;
+        material.mNumDirtyCount = SWAP_CHAIN_BUFFER_COUNT;
 
         mConstantBufferSize += Math::AlignUp(material.GetMaterialConstantSize(), 256) / 256;
         return material;

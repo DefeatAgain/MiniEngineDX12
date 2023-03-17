@@ -72,6 +72,7 @@ void MaterialManager::Update()
 
     if (mNumDirtyCount > 0 && mConstantBufferSize > 0)
     {
+        mGpuBuffer[CURRENT_FARME_BUFFER_INDEX].Destroy();
         mGpuBuffer[CURRENT_FARME_BUFFER_INDEX].Create(L"Material Buffer", mConstantBufferSize * 256 * 2);
         mNumDirtyCount--;
     }
@@ -85,13 +86,15 @@ void MaterialManager::Update()
 void MaterialManager::UpdateMaterial(size_t index)
 {
     Material* material = mAllMaterials[index].get();
+    size_t a = material->mNumDirtyCount;
     if (material->mNumDirtyCount == 0)
         return;
+    --material->mNumDirtyCount;
 
     void* mappedBuffer = mGpuBuffer[CURRENT_FARME_BUFFER_INDEX].Map();
     mappedBuffer = (uint8_t*)mappedBuffer + 256 * material->mBufferOffset;
-    CopyMemory(mappedBuffer, material->GetMaterialConstant(), Math::AlignUp(material->GetMaterialConstantSize(), 256));
+
+    CopyMemory(mappedBuffer, material->GetMaterialConstant(), material->GetMaterialConstantSize());
 
     material->UpdateDescriptor();
-    --material->mNumDirtyCount;
 }

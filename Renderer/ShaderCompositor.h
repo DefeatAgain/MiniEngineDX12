@@ -15,7 +15,7 @@ class ShaderUnit : public NonCopyable
 {
 	friend class ShaderCompositor;
 public:
-	ShaderUnit(const std::filesystem::path& filename, const std::vector<const char*>& defaultDefines, eShaderType type);
+	ShaderUnit(const std::filesystem::path& filename, const std::vector<std::string>& defaultDefines, eShaderType type);
 	~ShaderUnit() {}
 
 	std::unique_ptr<D3D_SHADER_MACRO[]> GetShaderMacros();
@@ -44,7 +44,7 @@ public:
 	const ShaderUnit& AddShader(const std::string& shaderName,
 		const std::filesystem::path& filename, 
 		eShaderType type, 
-		const std::vector<const char*>& defaultDefines = {});
+		const std::vector<std::string>& defaultDefines = {});
 
 	ID3DBlob* GetShaderByteCode(const std::string& shaderName) { return GetShader(shaderName).GetBlob(); }
 
@@ -61,4 +61,5 @@ private:
 };
 
 #define ADD_SHADER(shaderName, filename, type, ...) (ShaderCompositor::GetInstance()->AddShader(shaderName, filename, type, __VA_ARGS__))
+#define ADD_SHADER_VEC(shaderName, filename, type, vec) (ShaderCompositor::GetInstance()->AddShader(shaderName, filename, type, vec))
 #define GET_SHADER(shaderName) ShaderCompositor::GetInstance()->GetShader(shaderName)

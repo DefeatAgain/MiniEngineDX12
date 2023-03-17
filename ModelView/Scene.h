@@ -10,9 +10,16 @@
 
 class CameraController;
 class GraphicsCommandList;
+class MeshRendererBuilder;
+
 namespace glTF
 {
     struct Node;
+}
+
+namespace MainView
+{
+    void ShowUI(Scene*);
 }
 
 enum SceneTextureHandles
@@ -26,6 +33,7 @@ enum SceneTextureHandles
 
 class Scene : public Graphics::MutiGraphicsContext
 {
+    friend void MainView::ShowUI(Scene*);
 public:
 	Scene() {}
     ~Scene() { Destroy(); }
@@ -41,7 +49,6 @@ public:
     virtual void Render() override;
 
     void SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL);
-    void SetIBLBias(float LODBias) { mSpecularIBLBias = LODBias; }
     void SetIBLRange(float range) { mSpecularIBLRange = range; }
 
     void ResizeModels(size_t numModels) { mModels.resize(numModels);  }
@@ -50,28 +57,33 @@ public:
     const Model& GetModel(size_t index) const { return mModels[index]; }
     const Math::AffineTransform& GetModelTranform(size_t index) const { return mModelWorldTransform[index]; }
 
-    float GetIBLBias() const { return mSpecularIBLBias; }
     float GetIBLRange() const { return mSpecularIBLRange; }
 
     DescriptorHandle GetSceneTextureHandles() const { return mSceneTextureGpuHandle; }
-private:
-    void UpdateModels();
-    void MapGpuDescriptors();
-    void MapShadowDescriptors();
-    
-    void UpdateModelConstantBuffer();
+    DescriptorHandle GetShadowTextureHandle() const;
 
+    void ResetShadowMap();
+private:
+    void SetRenderModels(MeshRenderer& renderer);
+    std::shared_ptr<MeshRendererBuilder> SetMeshRenderers();
+
+    void UpdateModels();
+    void UpdateLight();
+
+    void MapGpuDescriptors();
+    
     void UpdateModelBoundingSphere();
 
-    CommandList* RenderScene(CommandList* context);
+    CommandList* RenderScene(CommandList* context, std::shared_ptr<MeshRendererBuilder> meshRendererBuilder);
     void RenderSkyBox(GraphicsCommandList& context);
 private:
 	Math::Camera mSceneCamera;
-	ShadowCamera mShadowCamera;
+    std::vector<ShadowCamera>  mShadowCameras;
     std::unique_ptr<CameraController> mCameraController;
     float mSunDirectionTheta;
     float mSunDirectionPhi;
     Vector3 mSunLightIntensity;
+    Vector3 mSunDirection;
 
 	std::vector<Model> mModels;
 	std::vector<Math::AffineTransform> mModelWorldTransform;
@@ -83,7 +95,8 @@ private:
     TextureRef mRadianceCubeMap;
     TextureRef mIrradianceCubeMap;
     float mSpecularIBLRange;
-    float mSpecularIBLBias;
+    float mShadowBias;
 
+    DescriptorHandle mShadowGpuHandle;
     DescriptorHandle mSceneTextureGpuHandle;
 };

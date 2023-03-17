@@ -58,7 +58,7 @@ float GeometrySmith(float3 N, float3 wo, float3 wi, float roughness)
 float3 ComputeNormal(Texture2D<float3> normalTexture, SamplerState normalSampler, 
     float2 uv, float3 normal, float4 tangent, float normalTextureScale)
 {
-    normal = normalize(normal);
+    // normal = normalize(normal);
     // Construct tangent frame
     float3 T = normalize(tangent.xyz);
     float3 B = normalize(cross(normal, T)) * tangent.w;

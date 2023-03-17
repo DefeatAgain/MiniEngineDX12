@@ -16,6 +16,8 @@
 #include "Math/VectorMath.h"
 #include "Math/Frustum.h"
 
+#include <vector>
+
 namespace Graphics
 {
     extern bool gReversedZ;
@@ -174,6 +176,34 @@ public:
         Math::Vector3 ShadowBounds		// Width, height, and depth in world space represented by the shadow buffer
     );
 
+    void UpdateMatrix(
+        Math::Vector3 lightDirection,		        // Direction parallel to light, in direction of travel
+        const Math::Frustum& mainCameraFrustumW,	// 
+        float cameraNearstZOffset,                  // Light camera Z offset to AABB
+        uint32_t bufferWidth,		                // Shadow buffer width
+        uint32_t bufferHeight,		                // Shadow buffer height--usually same as width
+        uint32_t bufferPrecision
+    );
+
+    static void GetDivideCSMCameras(
+        std::vector<ShadowCamera>& shadowCameras,
+        const float zDivides[],
+        uint32_t numDivides,
+        uint32_t maxNumDivides, 
+        Math::Vector3 lightDirection,		        // Direction parallel to light, in direction of travel
+        const Math::Camera& mainCamera,	            // 
+        float cameraNearstZOffset,                  // Light camera Z offset to AABB
+        uint32_t bufferWidth,		                // Shadow buffer width
+        uint32_t bufferHeight,		                // Shadow buffer height--usually same as width
+        uint32_t bufferPrecision
+    );
+
+    static void GetDivideCSMZRange(float* CSMZDivides, const Math::Camera& mainCamera,
+        const float* zDivides, uint32_t numDivides, uint32_t maxNumDivides);
+
+    static void GetDivideCSMZRange(Math::Vector3& CSMZDivides, const Math::Camera& mainCamera, const float* zDivides,
+        uint32_t numDivides, uint32_t maxNumDivides);
+  
     const Math::Matrix4& GetShadowMatrix() const { return mShadowMatrix; }
 
 private:

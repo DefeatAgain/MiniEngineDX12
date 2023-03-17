@@ -112,7 +112,7 @@ private:
 
     FrameContext* GetCurFrameContext() const { return mFrameContexts[mCurFrameContextIdx].get(); }
 private:
-    size_t mCurFrameContextIdx = 0;
+    size_t mCurFrameContextIdx;
     std::vector<std::unique_ptr<FrameContext>> mFrameContexts;
 
     std::list<std::unique_ptr<CommandList>> mCommandListPool[Graphics::NUM_RENDER_TASK_TYPE];

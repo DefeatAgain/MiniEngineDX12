@@ -84,7 +84,7 @@ void MeshManager::TransitionStateToRead(GraphicsCommandList& ghCommandList)
 {
     ghCommandList.TransitionResource(mGpuBuffer[kVertexBuffer], D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
     ghCommandList.TransitionResource(mGpuBuffer[kIndexBuffer], D3D12_RESOURCE_STATE_INDEX_BUFFER);
-    ghCommandList.TransitionResource(mGpuBuffer[kVertexBuffer], D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+    ghCommandList.TransitionResource(mGpuBuffer[kDepthVertexBuffer], D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 }
 
 void MeshManager::ReserveBuffer(uint32_t vertexBufferSize, uint32_t depthVertexBufferSize, uint32_t indexBufferSize)

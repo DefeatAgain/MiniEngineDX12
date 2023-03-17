@@ -236,9 +236,9 @@ public:
     void ClearUAV(ColorBuffer& target);
     void ClearColor(ColorBuffer& target, D3D12_RECT* rect = nullptr);
     void ClearColor(ColorBuffer& target, float color[4], D3D12_RECT* rect = nullptr);
-    void ClearDepth(DepthBuffer& target);
-    void ClearStencil(DepthBuffer& target);
-    void ClearDepthAndStencil(DepthBuffer& target);
+    void ClearDepth(DepthBuffer& target, UINT arraySlice = 0);
+    void ClearStencil(DepthBuffer& target, UINT arraySlice = 0);
+    void ClearDepthAndStencil(DepthBuffer& target, UINT arraySlice = 0);
 
     void BeginQuery(ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT heapIndex);
     void EndQuery(ID3D12QueryHeap* queryHeap, D3D12_QUERY_TYPE type, UINT heapIndex);
@@ -288,6 +288,7 @@ public:
     void DrawIndexed(UINT indexCount, UINT startIndexLocation = 0, INT baseVertexLocation = 0);
     void DrawInstanced(UINT vertexCountPerInstance, UINT instanceCount, UINT startVertexLocation = 0, UINT startInstanceLocation = 0);
     void DrawIndexedInstanced(UINT indexCountPerInstance, UINT instanceCount, UINT startIndexLocation, INT baseVertexLocation, UINT startInstanceLocation);
+    void ResolveMSAAResource(GpuResource& dest, GpuResource& src, DXGI_FORMAT destFormat);
     //void DrawIndirect(GpuBuffer& argumentBuffer, uint64_t argumentBufferOffset = 0);
     //void ExecuteIndirect(CommandSignature& commandSig, GpuBuffer& argumentBuffer, uint64_t argumentStartOffset = 0,
     //    uint32_t maxCommands = 1, GpuBuffer* commandCounterBuffer = nullptr, uint64_t counterOffset = 0);
