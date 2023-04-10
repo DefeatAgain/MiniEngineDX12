@@ -32,8 +32,9 @@ namespace GameApp
 
 	void SceneGameApp::Start()
 	{
-		//sAsset.Parse(L"Asset/Sponza2/sponza2.gltf");
-		sAsset.Parse(L"Asset/CSMTest/CSMTest.gltf");
+		sAsset.Parse(L"Asset/Sponza2/sponza2.gltf");
+		//sAsset.Parse(L"Asset/CSMTest/CSMTest.gltf");
+		//sAsset.Parse(L"Asset/MetalRoughSpheres/MetalRoughSpheres.gltf");
 
 		ModelConverter::BuildMaterials(sAsset);
 		ModelConverter::BuildAllMeshes(sAsset);

@@ -102,6 +102,7 @@ private:
 public:
     ~TextureManager() {}
 
+    TextureRef GetTexture(Graphics::eDefaultTexture fallback);
     TextureRef GetTexture(const std::filesystem::path& filename);
     TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags);
     TextureRef GetTexture(const std::filesystem::path& filename, uint16_t flags,
@@ -120,3 +121,4 @@ private:
 #define GET_TEX(filename) TextureManager::GetInstance()->GetTexture(filename)
 #define GET_TEXF(filename, flags) TextureManager::GetInstance()->GetTexture(filename, flags)
 #define GET_TEXFF(filename, flags, fallback) TextureManager::GetInstance()->GetTexture(filename, flags, fallback)
+#define GET_TEXD(fallback) TextureManager::GetInstance()->GetTexture(fallback)

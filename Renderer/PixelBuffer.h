@@ -28,6 +28,7 @@ public:
     static DXGI_FORMAT GetDepthFormat(DXGI_FORMAT format);
     static DXGI_FORMAT GetStencilFormat(DXGI_FORMAT format);
     static size_t BytesPerPixel(DXGI_FORMAT format);
+    static bool CanTypedUAV(DXGI_FORMAT format);
 protected:
     CommandList* ExportToFileTask(CommandList* copyList, ReadbackBuffer& dstBuffer, D3D12_PLACED_SUBRESOURCE_FOOTPRINT& placedFootprint);
 
@@ -95,11 +96,11 @@ protected:
     // 0 for ArrayCount to reserve space for mips at creation time.
     CommandList* GenerateMipMapsTask(CommandList* commandList, const DescriptorHandle& uavHandle);
 
-    D3D12_RESOURCE_FLAGS CombineResourceFlags() const
+    D3D12_RESOURCE_FLAGS CombineResourceFlags(DXGI_FORMAT format) const
     {
         D3D12_RESOURCE_FLAGS Flags = D3D12_RESOURCE_FLAG_NONE;
 
-        if (Flags == D3D12_RESOURCE_FLAG_NONE && mSampleCount == 1)
+        if (CanTypedUAV(format) && Flags == D3D12_RESOURCE_FLAG_NONE && mSampleCount == 1)
             Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | Flags;

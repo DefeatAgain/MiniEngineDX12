@@ -12,7 +12,7 @@
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
         "addressW = TEXTURE_ADDRESS_CLAMP," \
-        "filter = FILTER_MIN_MAG_LINEAR_MIP_POINT),"
+        "filter = FILTER_MIN_MAG_MIP_POINT),"
 
 #ifdef REVERSED_Z
     #define STATIC_SHADOW_CMP_SAMPLER  "StaticSampler(s12, visibility = SHADER_VISIBILITY_PIXEL," \
@@ -20,19 +20,19 @@
         "addressV = TEXTURE_ADDRESS_CLAMP," \
         "addressW = TEXTURE_ADDRESS_CLAMP," \
         "comparisonFunc = COMPARISON_GREATER_EQUAL," \
-        "filter = FILTER_MIN_MAG_LINEAR_MIP_POINT)," 
+        "filter = FILTER_MIN_MAG_MIP_POINT)," 
 #else
     #define STATIC_SHADOW_CMP_SAMPLER  "StaticSampler(s12, visibility = SHADER_VISIBILITY_PIXEL," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
         "addressW = TEXTURE_ADDRESS_CLAMP," \
         "comparisonFunc = COMPARISON_LESS_EQUAL," \
-        "filter = FILTER_MIN_MAG_LINEAR_MIP_POINT)," 
+        "filter = FILTER_MIN_MAG_MIP_POINT)," 
 #endif
 
 #define ForwardRendererRootSig  ForwardRendererRootSig1 STATIC_SHADOW_CMP_SAMPLER
 
 // Common (static) samplers
 SamplerState defaultSampler : register(s10);
-SamplerState shadowSamplerPoint : register(s11);
+SamplerState pointSampler : register(s11);
 SamplerComparisonState shadowSamplerComparison : register(s12);

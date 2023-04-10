@@ -152,6 +152,11 @@ namespace Graphics
         return gSceneDepthBuffer[i];
     }
 
+    DepthBuffer* GetSceneDepthBuffers()
+    {
+        return gSceneDepthBuffer;
+    }
+
     DescriptorHandle GetSceneColorBufferSRV(uint32_t i)
     {
         return gSceneColorBufferGpuSRV + i;

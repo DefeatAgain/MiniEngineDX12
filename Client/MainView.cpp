@@ -36,7 +36,7 @@ void MainView::ShowUI(Scene* scene)
 
 		ImGui::SeparatorText("ShadowBias");
 		ImGui::Text("ShadowBias");
-		ImGui::SliderFloat("ShadowBias", &scene->mShadowBias, 0.001f, 0.05f, "%.4f");
+		ImGui::SliderFloat("ShadowBias", &scene->mShadowBias, 0.001f, 0.01f, "%.4f");
 		ImGui::Text("ShadowMsaa");
 		int shadowMsaa = ModelRenderer::gMsaaShadowSample;
 		ImGui::RadioButton("off", &shadowMsaa, 0); ImGui::SameLine();
@@ -46,7 +46,7 @@ void MainView::ShowUI(Scene* scene)
 		if (shadowMsaa != (int)ModelRenderer::gMsaaShadowSample)
 		{
 			ModelRenderer::ResetShadowMsaa(shadowMsaa);
-			scene->ResetShadowMap();
+			scene->ResetShadowMapHandle();
 		}
 	}
 

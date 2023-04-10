@@ -47,6 +47,7 @@ struct PBRMaterialConstants
 struct GlobalConstants
 {
     Math::Matrix4 ViewProjMatrix;
+    Math::Matrix4 InvViewProjMatrix;
     Math::Matrix4 SunShadowMatrix[MAX_CSM_DIVIDES + 1];
     Math::Vector3 CSMDivides;
     Math::Vector3 CameraPos;

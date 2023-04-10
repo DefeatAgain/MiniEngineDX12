@@ -10,7 +10,8 @@ cbuffer MeshConstants : register(b0)
 cbuffer GlobalConstants : register(b1)
 {
     float4x4 gViewProjMatrix;
-    float4x4 gShadowFinalMatrix[MAX_CSM_SHADOW_DIVIDES + 1];
+    float4x4 gInvViewProjMatrix;
+    float4x4 gShadowFinalMatrix[MAX_NUM_CSM_SHADOW_MAP];
 }
 
 struct VSInput
@@ -32,7 +33,7 @@ struct VSOutput
     float4 tangetWorld : TANGENT;
     float2 uv0 : TEXCOORD0;
 #if NUM_CSM_SHADOW_MAP > 1
-    float3 shadowCoord[MAX_CSM_SHADOW_DIVIDES] : POSITION1;
+    float3 shadowCoord[NUM_CSM_SHADOW_MAP] : POSITION1;
 #else
     float3 shadowCoord : POSITION1;
 #endif

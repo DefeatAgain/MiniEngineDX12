@@ -426,6 +426,55 @@ size_t PixelBuffer::BytesPerPixel(DXGI_FORMAT format)
     }
 }
 
+bool PixelBuffer::CanTypedUAV(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+    case DXGI_FORMAT_R32G32B32A32_FLOAT:
+    case DXGI_FORMAT_R32G32B32A32_UINT:
+    case DXGI_FORMAT_R32G32B32A32_SINT:
+    case DXGI_FORMAT_R16G16B16A16_FLOAT:
+    case DXGI_FORMAT_R16G16B16A16_UNORM:
+    case DXGI_FORMAT_R16G16B16A16_UINT:
+    case DXGI_FORMAT_R16G16B16A16_SNORM:
+    case DXGI_FORMAT_R16G16B16A16_SINT:
+    case DXGI_FORMAT_R32G32_FLOAT:
+    case DXGI_FORMAT_R32G32_UINT:
+    case DXGI_FORMAT_R32G32_SINT:
+    case DXGI_FORMAT_R10G10B10A2_UNORM:
+    case DXGI_FORMAT_R10G10B10A2_UINT:
+    case DXGI_FORMAT_R11G11B10_FLOAT:
+    case DXGI_FORMAT_R8G8B8A8_UNORM:
+    case DXGI_FORMAT_R8G8B8A8_UINT:
+    case DXGI_FORMAT_R8G8B8A8_SNORM:
+    case DXGI_FORMAT_R8G8B8A8_SINT:
+    case DXGI_FORMAT_R16G16_FLOAT:
+    case DXGI_FORMAT_R16G16_UNORM:
+    case DXGI_FORMAT_R16G16_UINT:
+    case DXGI_FORMAT_R16G16_SNORM:
+    case DXGI_FORMAT_R16G16_SINT:
+    case DXGI_FORMAT_R32_FLOAT:
+    case DXGI_FORMAT_R32_UINT:
+    case DXGI_FORMAT_R32_SINT:
+    case DXGI_FORMAT_R8G8_UNORM:
+    case DXGI_FORMAT_R8G8_UINT:
+    case DXGI_FORMAT_R8G8_SNORM:
+    case DXGI_FORMAT_R8G8_SINT:
+    case DXGI_FORMAT_R16_FLOAT:
+    case DXGI_FORMAT_R16_UNORM:
+    case DXGI_FORMAT_R16_UINT:
+    case DXGI_FORMAT_R16_SNORM:
+    case DXGI_FORMAT_R16_SINT:
+    case DXGI_FORMAT_R8_UNORM:
+    case DXGI_FORMAT_R8_UINT:
+    case DXGI_FORMAT_R8_SNORM:
+    case DXGI_FORMAT_R8_SINT:
+        return true;
+    default:
+        return false;
+    }
+}
+
 
 // -- ColorBuffer --
 void ColorBuffer::Destroy()
@@ -454,7 +503,7 @@ void ColorBuffer::CreateFromSwapChain(const std::wstring& name, ID3D12Resource* 
 void ColorBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height, uint32_t numMips, DXGI_FORMAT format)
 {
     numMips = (numMips == 0 ? ComputeNumMips(width, height) : numMips);
-    D3D12_RESOURCE_FLAGS Flags = CombineResourceFlags();
+    D3D12_RESOURCE_FLAGS Flags = CombineResourceFlags(format);
     D3D12_RESOURCE_DESC resourceDesc = DescribeTex2D(width, height, 1, numMips, format, Flags);
 
     resourceDesc.SampleDesc.Count = mSampleCount;
@@ -473,7 +522,7 @@ void ColorBuffer::Create(const std::wstring& name, uint32_t width, uint32_t heig
 
 void ColorBuffer::CreateArray(const std::wstring& name, uint32_t width, uint32_t height, uint32_t arrayCount, DXGI_FORMAT format)
 {
-    D3D12_RESOURCE_FLAGS flags = CombineResourceFlags();
+    D3D12_RESOURCE_FLAGS flags = CombineResourceFlags(format);
     D3D12_RESOURCE_DESC resourceDesc = DescribeTex2D(width, height, arrayCount, 1, format, flags);
 
     D3D12_CLEAR_VALUE clearValue{};

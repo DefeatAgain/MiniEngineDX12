@@ -11,6 +11,7 @@
 class CameraController;
 class GraphicsCommandList;
 class MeshRendererBuilder;
+class FullScreenRenderer;
 
 namespace glTF
 {
@@ -61,11 +62,13 @@ public:
 
     DescriptorHandle GetSceneTextureHandles() const { return mSceneTextureGpuHandle; }
     DescriptorHandle GetShadowTextureHandle() const;
+    DescriptorHandle GetDeferredTextureHandle() const;
 
-    void ResetShadowMap();
+    void ResetShadowMapHandle();
 private:
     void SetRenderModels(MeshRenderer& renderer);
     std::shared_ptr<MeshRendererBuilder> SetMeshRenderers();
+    std::pair<std::shared_ptr<MeshRendererBuilder>, std::shared_ptr<FullScreenRenderer>> SetMeshRenderersDeferred();
 
     void UpdateModels();
     void UpdateLight();
@@ -75,6 +78,8 @@ private:
     void UpdateModelBoundingSphere();
 
     CommandList* RenderScene(CommandList* context, std::shared_ptr<MeshRendererBuilder> meshRendererBuilder);
+    CommandList* RenderSceneDeferred(CommandList* context, std::shared_ptr<MeshRendererBuilder> meshRendererBuilder, 
+        std::shared_ptr<FullScreenRenderer> deferredRender);
     void RenderSkyBox(GraphicsCommandList& context);
 private:
 	Math::Camera mSceneCamera;
@@ -94,9 +99,11 @@ private:
 
     TextureRef mRadianceCubeMap;
     TextureRef mIrradianceCubeMap;
+    TextureRef mPreComputeBRDF;
     float mSpecularIBLRange;
     float mShadowBias;
 
     DescriptorHandle mShadowGpuHandle;
     DescriptorHandle mSceneTextureGpuHandle;
+    DescriptorHandle mDeferredTextureGpuHandle;
 };

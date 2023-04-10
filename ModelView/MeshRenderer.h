@@ -6,6 +6,12 @@
 #include "Utils/DebugUtils.h"
 
 #define SHADOW_MAP_FORMAT DXGI_FORMAT_D32_FLOAT
+#define DEFERRED_RENDER
+
+#ifdef DEFERRED_RENDER
+#define DEFERRED_GBUFFER0_FORMAT DXGI_FORMAT_R32G32B32A32_UINT
+#endif // DEFERRED_RENDER
+
 
 struct Mesh;
 struct SubMesh;
@@ -23,12 +29,6 @@ struct GlobalConstants;
 
 namespace ModelRenderer
 {
-    enum eDepthPsoFlags : uint8_t
-    {
-        kIsDepth = 0x1,
-        kIsShadow = 0x2,
-    };
-
     __declspec(align(4)) struct RendererPsoDesc
     {
         uint16_t meshPSOFlags;
@@ -40,11 +40,19 @@ namespace ModelRenderer
                 uint8_t isDepth : 1;
                 uint8_t isShadow : 1;
                 uint8_t shadowMsaaCount : 2;
-                uint8_t : 4;
+                uint8_t numCSMDividesCount : 2;
+                uint8_t : 2;
             };
         };
-        uint8_t numCSMDividesCount : 2;
-        uint8_t : 6;
+        union
+        {
+            uint8_t fullScreenFlags;
+            struct
+            {
+                uint8_t isDeferredFinal : 1;
+                uint8_t : 7;
+            };
+        };
     };
 
     enum ForwardRendererBindings
@@ -62,6 +70,17 @@ namespace ModelRenderer
         kNumRootBindings
     };
 
+    enum DeferredRendererBindings
+    {
+        kGBufferTextures,
+        kGlobalConstantsDeferred,
+
+        kSceneTexturesDeferred,
+        kShadowTextureDeferred,
+
+        kNumRootBindingsDeferred
+    };
+
     extern std::vector<GraphicsPipelineState*> sAllPSOs;
 
     extern RootSignature* sForwardRootSig;
@@ -75,10 +94,13 @@ namespace ModelRenderer
     void Destroy();
 
     uint16_t GetPsoIndex(RendererPsoDesc rendererPsoDesc);
+    uint16_t GetFullScreenPsoIndex(RendererPsoDesc rendererPsoDesc);
     ShadowBuffer* GetShadowBuffers();
     ColorBuffer* GetNonMsaaShadowBuffers();
+    ColorBuffer* GetGBuffers();
     ShadowBuffer& GetCurrentShadowBuffer();
     ColorBuffer& GetCurrentNonMsaaShadowBuffer();
+    ColorBuffer& GetCurrentGBuffer();
 
     void ResetShadowMsaa(uint32_t sampleCount);
 }
@@ -86,7 +108,7 @@ namespace ModelRenderer
 class MeshRenderer : public NonCopyable
 {
 public:
-    enum BatchType { kDefault, kShadows, kNumBachTypes };
+    enum BatchType { kDefault, kShadows, kGBuffer, kNumBachTypes };
     enum DrawPass { kZPass, kOpaque, kTransparent, kNumPasses };
 
 protected:
@@ -215,6 +237,23 @@ public:
 };
 
 
+class DeferredRenderer : public MeshRenderer
+{
+public:
+    DeferredRenderer()
+    {
+        mBatchType = kGBuffer;
+    }
+
+    virtual void RenderMeshesBegin(GraphicsCommandList& context, GlobalConstants& globals,
+        DrawPass pass) override;
+    //virtual void RenderMeshesImpl(GraphicsCommandList& context, GlobalConstants& globals,
+    //    DrawPass pass, RenderPass& renderPass) override;
+    virtual void RenderMeshesEnd(GraphicsCommandList& context, GlobalConstants& globals,
+        DrawPass pass) override;
+};
+
+
 class MeshRendererBuilder : public NonCopyable
 {
 public:
@@ -233,4 +272,40 @@ public:
     T& Get(MeshRenderer::BatchType type) { return static_cast<T&>(*mMeshRenderers[type]); }
 private:
     std::vector<std::unique_ptr<MeshRenderer>> mMeshRenderers;
+};
+
+
+class FullScreenRenderer
+{
+public:
+    enum BatchType { mDeferredFinal };
+public:
+    FullScreenRenderer() { Reset(); mBatchType = mDeferredFinal; }
+    ~FullScreenRenderer() {}
+
+    void Reset();
+
+    void AddRenderTarget(ColorBuffer& RTV)
+    {
+        ASSERT(mNumRTVs < 8);
+        mRenderTargets[mNumRTVs++] = &RTV;
+    }
+
+    void SetScene(const Scene& scene) { mScene = &scene; }
+    void SetViewport(const D3D12_VIEWPORT& viewport) { mViewport = viewport; }
+    void SetScissor(const D3D12_RECT& scissor) { mScissor = scissor; }
+    void SetCamera(const Math::BaseCamera& camera) { mCamera = &camera; }
+
+    void SetPSO();
+
+    void RenderScreen(GraphicsCommandList& context, GlobalConstants& globals);
+private:
+    D3D12_VIEWPORT mViewport;
+    D3D12_RECT mScissor;
+    uint32_t mNumRTVs;
+    const Scene* mScene;
+    ColorBuffer* mRenderTargets[8];
+    const Math::BaseCamera* mCamera;
+    BatchType mBatchType;
+    uint16_t mPSOIndex;
 };

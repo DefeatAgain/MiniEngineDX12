@@ -478,18 +478,14 @@ CommandList* Texture::InitTextureTask1(CommandList* commandList, std::shared_ptr
 // -- TextureRef --
 DescriptorHandle TextureRef::GetSRV() const
 {
-    if (mRef == nullptr)
-        return Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D).GetSRV();
-    else if(!IsValid())
+    if (mRef == nullptr || !IsValid())
         return Graphics::GetDefaultTexture(mRef->GetFallback()).GetSRV();
     return mRef->GetSRV();
 }
 
 const Texture* TextureRef::Get() const
 {
-    if (mRef == nullptr)
-        return &Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D);
-    else if (!IsValid())
+    if (mRef == nullptr || !IsValid())
         return &Graphics::GetDefaultTexture(mRef->GetFallback());
     return mRef;
 }
@@ -497,6 +493,11 @@ const Texture* TextureRef::Get() const
 
 // -- TextureManager --
 static std::queue<std::future<void>> sPrepareList;
+
+TextureRef TextureManager::GetTexture(Graphics::eDefaultTexture fallback)
+{
+    return TextureRef(&Graphics::GetDefaultTexture(fallback));
+}
 
 TextureRef TextureManager::GetTexture(const std::filesystem::path& filename)
 {

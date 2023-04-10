@@ -6,7 +6,7 @@
 Texture2D<float4> baseColorTexture          : register(t0);
 Texture2D<float3> metallicRoughnessTexture  : register(t1);
 Texture2D<float3> emissiveTexture           : register(t2);
-Texture2D<float3> normalTexture             : register(t3);
+Texture2D<float2> normalTexture             : register(t3);
 
 SamplerState baseColorSampler               : register(s0);
 SamplerState metallicRoughnessSampler       : register(s1);
@@ -34,6 +34,7 @@ cbuffer MaterialConstants : register(b0)
 cbuffer GlobalConstants : register(b1)
 {
     float4x4 gViewProjMatrix;
+    float4x4 gInvViewProjMatrix;
     float4x4 gShadowFinalMatrix[MAX_CSM_SHADOW_DIVIDES + 1];
     float3 gCSMDivides;
     float3 gEyePos;
@@ -79,46 +80,46 @@ struct SurfaceProperties
     float3 diffuse;
     float3 specular;
     float roughness;
-    float metallic;
 };
 
 struct LightProperties
 {
     float3 instensity;
     float3 wi;
+    float3 wm;
     float distanceSqrDiv;
 };
 
 float3 GGXMicrofacet(LightProperties light, SurfaceProperties surf)
 {
-    float3 wm = normalize(light.wi + surf.wo);
-    float D = DistributionGGX(surf.N, wm, surf.roughness);
+    float D = DistributionGGX(surf.N, light.wm, surf.roughness);
     float G = GeometrySmith(surf.N, surf.wo, light.wi, surf.roughness);
-    float3 F = FresnelSchlickRoughness(surf.specular, wm, surf.wo, surf.roughness);
+    float3 F = FresnelSchlickRoughness(surf.specular, light.wm, surf.wo, surf.roughness);
 
     float3 specAlbedo = F * D * G / max(4.0f * dot(surf.N, surf.wo) * dot(surf.N, light.wi), 1e-6);
     float3 kS = F;
     float3 kD = 1.0 - kS;
 
-    return (surf.diffuse * kD / PI + specAlbedo) * light.instensity * light.distanceSqrDiv;
+    float NoL = max(dot(light.wi, surf.N), 0.0);
+
+    return (surf.diffuse * kD / PI + specAlbedo) * light.instensity * NoL * light.distanceSqrDiv;
 }
 
-float3 DiffuseIBL(SurfaceProperties surf)
+float3 CalcIBL(LightProperties light, SurfaceProperties surf)
 {
-    // Assumption:  L = N
-    return surf.diffuse * irradianceIBLTexture.Sample(defaultSampler, surf.N);
-}
+    float3 diffuse = surf.diffuse * irradianceIBLTexture.Sample(baseColorSampler, surf.N);
 
-float3 SpecularIBL(SurfaceProperties surf)
-{
     float lod = surf.roughness * gIBLRange;
     float NoV = dot(surf.wo, surf.N);
 
-    float3 prefilterLi = radianceIBLTexture.SampleLevel(defaultSampler, reflect(-surf.wo, surf.N), lod).rgb;
-    float2 preComputeBRDF = preComputeBRDFTexture.Sample(defaultSampler, float2(NoV, surf.roughness)).rg;
+    float3 prefilterLi = radianceIBLTexture.SampleLevel(defaultSampler, reflect(-surf.wo, surf.N), lod);
+    float2 preComputeBRDF = preComputeBRDFTexture.Sample(pointSampler, float2(NoV, surf.roughness));
 
+    // float3 F = FresnelSchlickRoughness(surf.specular, light.wm, light.wi, surf.roughness);
     float3 F = FresnelSchlickRoughness(surf.specular, NoV, surf.roughness);
-    return prefilterLi * (F * preComputeBRDF.r + preComputeBRDF.g);
+    // float3 F = SchlickFresnel(surf.specular, light.wm, surf.wo);
+
+    return diffuse * (1.0 - F) * PI_DIV + prefilterLi * (F * preComputeBRDF.r + preComputeBRDF.g) * (NoV > 0.0f);
 }
 
 
@@ -135,7 +136,6 @@ float4 main(PSIutput psInput) : SV_Target
     float4 baseColor = gBaseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR_FLAG));
     float3 occlusionMetallicRoughness = metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS_FLAG)).rgb;
     float2 metallicRoughness = gMetallicRoughnessFactor * occlusionMetallicRoughness.bg;
-    float occlusion = occlusionMetallicRoughness.r;
     float3 emissive = gEmissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE_FLAG));
     float3 normal = ComputeNormal(normalTexture, normalSampler, UVSET(NORMAL_FLAG), 
         psInput.normalWorld, psInput.tangetWorld, gNormalTextureScale);
@@ -143,16 +143,17 @@ float4 main(PSIutput psInput) : SV_Target
     SurfaceProperties surface;
     surface.N = normal;
     surface.wo = normalize(gEyePos - psInput.positionWorld);
-    surface.diffuse = baseColor.rgb * (1 - metallicRoughness.x) * occlusion;
-    surface.specular = lerp(kDielectricSpecular, baseColor.rgb, metallicRoughness.x) * occlusion;
+    surface.diffuse = baseColor.rgb * (1 - metallicRoughness.x);
+    surface.specular = lerp(kDielectricSpecular, baseColor.rgb, metallicRoughness.x);
     surface.roughness = metallicRoughness.y;
 
     LightProperties light;
     light.distanceSqrDiv = 1.0;
     light.wi = gSunDirection;
+    light.wm = normalize(light.wi + surface.wo);
     light.instensity = gSunIntensity;
 
-    float3 ambient = DiffuseIBL(surface) + SpecularIBL(surface);
+    float3 ambient = CalcIBL(light, surface);
     float3 sunLight = GGXMicrofacet(light, surface);
 #if NUM_CSM_SHADOW_MAP > 1
     float visiblity = CalcDirectionShadow(sunShadowTexture, shadowSamplerComparison, psInput.shadowCoord, gShadowBias, 

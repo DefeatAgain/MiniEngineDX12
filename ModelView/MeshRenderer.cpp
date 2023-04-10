@@ -15,19 +15,23 @@ namespace ModelRenderer
     std::map<size_t, uint32_t> sPSOIndices;
     GraphicsPipelineState sDefaultPSO; // Not finalized.  Used as a template.
     GraphicsPipelineState sDefaultShadowPSO; // Not finalized.  Used as a template.
+    GraphicsPipelineState sFullScreenPSO;
 
     std::wstring sShadowMapName = L"Shadow Map";
     uint32_t sShadowMapSize = 2048;
 
     std::vector<GraphicsPipelineState*> sAllPSOs;
     RootSignature* sForwardRootSig = nullptr;
+    RootSignature* sDeferredRootSig = nullptr;
     GraphicsPipelineState* sSkyboxPSO = nullptr;
 
     ShadowBuffer sShadowBuffer[SWAP_CHAIN_BUFFER_COUNT];
     ColorBuffer sNonMsaaShadowBuffer[SWAP_CHAIN_BUFFER_COUNT];
 
+    ColorBuffer sGubffer0[SWAP_CHAIN_BUFFER_COUNT];
+
     uint32_t gMsaaShadowSample = 2;
-    uint32_t gNumCSMDivides = 2;
+    uint32_t gNumCSMDivides = 3;
     float gCSMDivides[] = { 0.15f, 0.35f, 0.65f };
 }
 
@@ -76,6 +80,14 @@ void ModelRenderer::Initialize()
 {
     CreateShadowBuffers();
 
+#ifdef DEFERRED_RENDER
+    for (size_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
+    {
+        sGubffer0[i].Create(L"GBuffer 0", Graphics::gDisplayWidth, Graphics::gDisplayHeight, 1, DEFERRED_GBUFFER0_FORMAT);
+    }
+#endif // DEFERRED_RENDER
+
+
     Graphics::AddRSSTask([]()
     {
         SamplerDesc DefaultSamplerDesc;
@@ -102,6 +114,22 @@ void ModelRenderer::Initialize()
             D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 18, 1, D3D12_SHADER_VISIBILITY_PIXEL);
         sForwardRootSig->Finalize(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
+
+        sDeferredRootSig = GET_RSO(L"MeshRendererDeferred RSO");
+        sDeferredRootSig->Reset(kNumRootBindingsDeferred, 3);
+        sDeferredRootSig->InitStaticSampler(10, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+        sDeferredRootSig->InitStaticSampler(11, Graphics::SamplerPointClampDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+        sDeferredRootSig->InitStaticSampler(12, Graphics::SamplerShadowDescGE, D3D12_SHADER_VISIBILITY_PIXEL);
+        sDeferredRootSig->GetParam(kGlobalConstantsDeferred).InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_PIXEL);
+
+        sDeferredRootSig->GetParam(kGBufferTextures).InitAsDescriptorRange(
+            D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 4, D3D12_SHADER_VISIBILITY_PIXEL);
+        sDeferredRootSig->GetParam(kSceneTexturesDeferred).InitAsDescriptorRange(
+            D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 8, D3D12_SHADER_VISIBILITY_PIXEL);
+        sDeferredRootSig->GetParam(kShadowTextureDeferred).InitAsDescriptorRange(
+            D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 18, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+        sDeferredRootSig->Finalize(D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS);
+
         ADD_SHADER("SkyBoxVS", L"MeshRender/SkyBoxVS.hlsl", kVS);
         ADD_SHADER("SkyBoxPS", L"MeshRender/SkyBoxPS.hlsl", kPS);
         ADD_SHADER("ForwardVS", L"MeshRender/ForwardVS.hlsl", kVS);
@@ -110,6 +138,7 @@ void ModelRenderer::Initialize()
         ADD_SHADER("DepthOnlyPS", L"MeshRender/DepthOnlyPS.hlsl", kPS);
         ADD_SHADER("DepthOnlyVSCutOff", L"MeshRender/DepthOnlyVS.hlsl", kVS, { "ENABLE_ALPHATEST", "" });
         ADD_SHADER("DepthOnlyPSCutOff", L"MeshRender/DepthOnlyPS.hlsl", kPS, { "ENABLE_ALPHATEST", "" });
+        ADD_SHADER("DeferredPS", L"MeshRender/DeferredPS.hlsl", kPS);
     });
 
     Graphics::AddPSTask([]()
@@ -168,6 +197,21 @@ void ModelRenderer::Initialize()
         sSkyboxPSO->SetVertexShader(GET_SHADER("SkyBoxVS"));
         sSkyboxPSO->SetPixelShader(GET_SHADER("SkyBoxPS"));
         sSkyboxPSO->Finalize();
+
+        sFullScreenPSO.SetBlendState(Graphics::BlendDisable);
+        sFullScreenPSO.SetDepthStencilState(Graphics::DepthStateDisabled);
+        sFullScreenPSO.SetRasterizerState(Graphics::RasterizerTwoSided);
+        sFullScreenPSO.SetSampleMask(D3D12_DEFAULT_SAMEPLE_MASK);
+        sFullScreenPSO.SetInputLayout(0, nullptr);
+        sFullScreenPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+        sFullScreenPSO.SetVertexShader(GET_SHADER("ScreenQuadCommonVS"));
+        sFullScreenPSO.SetPixelShader(GET_SHADER("DeferredPS"));
+        sFullScreenPSO.SetRenderTargetFormat(renderFormat, DXGI_FORMAT_UNKNOWN);
+
+        //sDeferredFinalPSO = GET_GPSO(L"DeferredFinal PSO");
+        //*sDeferredFinalPSO = sFullScreenPSO;
+        //sDeferredFinalPSO->SetRootSignature(*sDeferredRootSig);
+        //sDeferredFinalPSO->Finalize();
     });
 }
 
@@ -222,7 +266,7 @@ uint16_t GetPsoIndexUnLocked(ModelRenderer::RendererPsoDesc rendererPsoDesc, siz
     //static std::mutex sMutex;
     //std::lock_guard<std::mutex> lockGuard(sMutex);
 
-    if (rendererPsoDesc.depthPsoFlags)
+    if (rendererPsoDesc.isDepth)
         return GetDepthPsoIndex(rendererPsoDesc, psoHash);
 
     ePSOFlags psoFlags = (ePSOFlags)rendererPsoDesc.meshPSOFlags;
@@ -238,8 +282,8 @@ uint16_t GetPsoIndexUnLocked(ModelRenderer::RendererPsoDesc rendererPsoDesc, siz
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> vertexLayout;
     vertexLayout.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT });
-    vertexLayout.push_back({ "NORMAL",   0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, D3D12_APPEND_ALIGNED_ELEMENT });
-    vertexLayout.push_back({ "TANGENT",  0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, D3D12_APPEND_ALIGNED_ELEMENT });
+    vertexLayout.push_back({ "NORMAL",   0, DXGI_FORMAT_R10G10B10A2_UNORM,     0, D3D12_APPEND_ALIGNED_ELEMENT });
+    vertexLayout.push_back({ "TANGENT",  0, DXGI_FORMAT_R10G10B10A2_UNORM,     0, D3D12_APPEND_ALIGNED_ELEMENT });
     vertexLayout.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT });
 
     if (psoFlags & kHasUV1)
@@ -247,9 +291,26 @@ uint16_t GetPsoIndexUnLocked(ModelRenderer::RendererPsoDesc rendererPsoDesc, siz
 
     colorPSO->SetInputLayout((uint32_t)vertexLayout.size(), vertexLayout.data());
 
+    std::vector<std::string> macros = { "REVERSED_Z", "" };
+
+#ifdef DEFERRED_RENDER
+    DXGI_FORMAT renderFormat = DEFERRED_GBUFFER0_FORMAT;
+    colorPSO->SetDepthStencilState(Graphics::DepthStateReadWrite);
+    colorPSO->SetRenderTargetFormats(1, &renderFormat, DSV_FORMAT);
+
+    const std::wstring vsFile = L"MeshRender/GBufferVS.hlsl";
+    const std::wstring psFile = L"MeshRender/GBufferPS.hlsl";
+
+    if (psoFlags & kAlphaTest)
+    {
+        macros.push_back("ENABLE_ALPHATEST");
+        macros.push_back("");
+    }
+#else
     const std::wstring vsFile = L"MeshRender/ForwardVS.hlsl";
     const std::wstring psFile = L"MeshRender/ForwardPS.hlsl";
-    std::vector<std::string> macros = { "REVERSED_Z", "" };
+#endif // DEFERRED_RENDER
+    
 
     if (psoFlags & kHasUV1)
     {
@@ -295,6 +356,43 @@ uint16_t ModelRenderer::GetPsoIndex(RendererPsoDesc rendererPsoDesc)
     return GetPsoIndexUnLocked(rendererPsoDesc, psoHash);
 }
 
+uint16_t ModelRenderer::GetFullScreenPsoIndex(RendererPsoDesc rendererPsoDesc)
+{
+    size_t psoHash = Utility::HashState(&rendererPsoDesc);
+    auto psoIndexIter = sPSOIndices.find(psoHash);
+    if (psoIndexIter != sPSOIndices.end())
+    {
+        return psoIndexIter->second;
+    }
+
+    GraphicsPipelineState* colorPSO;
+    colorPSO = GET_GPSO(std::wstring(L"FullScreenPSO ") + std::to_wstring(rendererPsoDesc.fullScreenFlags));
+    *colorPSO = ModelRenderer::sFullScreenPSO;
+
+    const std::wstring psFile = L"MeshRender/DeferredPS.hlsl";
+
+    std::vector<std::string> macros = { "REVERSED_Z", "" };
+    if (rendererPsoDesc.numCSMDividesCount > 0)
+    {
+        macros.push_back("NUM_CSM_SHADOW_MAP");
+        macros.push_back(std::to_string(rendererPsoDesc.numCSMDividesCount + 1));
+    }
+
+    colorPSO->SetPixelShader(GetShader(psFile, kPS, macros));
+    if (rendererPsoDesc.isDeferredFinal)
+    {
+        colorPSO->SetRootSignature(*ModelRenderer::sDeferredRootSig);
+    }
+
+    colorPSO->Finalize();
+
+    sAllPSOs.push_back(colorPSO);
+    uint16_t psoIndex = sAllPSOs.size() - 1;
+    sPSOIndices[psoHash] = psoIndex;
+
+    return psoIndex;
+}
+
 ShadowBuffer* ModelRenderer::GetShadowBuffers()
 {
     return sShadowBuffer;
@@ -305,6 +403,11 @@ ColorBuffer* ModelRenderer::GetNonMsaaShadowBuffers()
     return sNonMsaaShadowBuffer;
 }
 
+ColorBuffer* ModelRenderer::GetGBuffers()
+{
+    return sGubffer0;
+}
+
 ShadowBuffer& ModelRenderer::GetCurrentShadowBuffer()
 {
     return sShadowBuffer[CURRENT_FARME_BUFFER_INDEX];
@@ -313,6 +416,11 @@ ShadowBuffer& ModelRenderer::GetCurrentShadowBuffer()
 ColorBuffer& ModelRenderer::GetCurrentNonMsaaShadowBuffer()
 {
     return sNonMsaaShadowBuffer[CURRENT_FARME_BUFFER_INDEX];
+}
+
+ColorBuffer& ModelRenderer::GetCurrentGBuffer()
+{
+    return sGubffer0[CURRENT_FARME_BUFFER_INDEX];
 }
 
 void ModelRenderer::ResetShadowMsaa(uint32_t sampleCount)
@@ -411,7 +519,16 @@ void MeshRenderer::AddMesh(size_t passIndex, const SubMesh& subMesh, const Model
         renderePass.sortKeys.push_back(key);
         renderePass.passCounts[kZPass]++;
     }
-    else if (subMesh.psoFlags & ePSOFlags::kAlphaBlend)
+    else if (mBatchType == kGBuffer)
+    {
+        if (alphaBlend)
+            return;
+
+        key.passID = kOpaque;
+        renderePass.sortKeys.push_back(key);
+        renderePass.passCounts[kOpaque]++;
+    }
+    else if (alphaBlend)
     {
         key.passID = kTransparent;
         key.distance = ~dist.u;
@@ -464,6 +581,7 @@ void MeshRenderer::RenderMeshesImpl(GraphicsCommandList& context, GlobalConstant
 {
     // Set common shader constants
     globals.ViewProjMatrix = renderPass.camera->GetViewProjMatrix();
+    globals.InvViewProjMatrix = Math::Invert(renderPass.camera->GetViewProjMatrix());
     globals.CameraPos = renderPass.camera->GetPosition();
 
     context.SetRootSignature(*ModelRenderer::sForwardRootSig);
@@ -575,4 +693,66 @@ void ShadowMeshRenderer::RenderMeshesEnd(GraphicsCommandList& context, GlobalCon
     {
         context.TransitionResource(*mDepthBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     }
+}
+
+
+
+void DeferredRenderer::RenderMeshesBegin(GraphicsCommandList& context, GlobalConstants& globals, DrawPass pass)
+{
+    context.TransitionResource(*mDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    context.TransitionResource(*mRenderTargets[0], D3D12_RESOURCE_STATE_RENDER_TARGET);
+    context.ClearDepth(*mDepthBuffer);
+    context.ClearColor(*mRenderTargets[0]);
+    context.SetRenderTarget(mRenderTargets[0]->GetRTV(), mDepthBuffer->GetDSV());
+}
+
+void DeferredRenderer::RenderMeshesEnd(GraphicsCommandList& context, GlobalConstants& globals, DrawPass pass)
+{
+    context.TransitionResource(*mDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    context.TransitionResource(*mRenderTargets[0], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+}
+
+
+void FullScreenRenderer::Reset()
+{
+    mNumRTVs = 0;
+    mScene = nullptr;
+    mPSOIndex = 0;
+    for (size_t i = 0; i < 8; i++)
+    {
+        mRenderTargets[i] = nullptr;
+    }
+    mCamera = nullptr;
+}
+
+void FullScreenRenderer::SetPSO()
+{
+    ModelRenderer::RendererPsoDesc rendererPsoDesc{};
+    rendererPsoDesc.numCSMDividesCount = ModelRenderer::gNumCSMDivides;
+    rendererPsoDesc.isDeferredFinal = 1;
+
+    mPSOIndex = ModelRenderer::GetFullScreenPsoIndex(rendererPsoDesc);
+}
+
+void FullScreenRenderer::RenderScreen(GraphicsCommandList& context, GlobalConstants& globals)
+{
+    globals.ViewProjMatrix = mCamera->GetViewProjMatrix();
+    globals.InvViewProjMatrix = Math::Invert(mCamera->GetViewProjMatrix());
+    globals.CameraPos = mCamera->GetPosition();
+
+    if (mBatchType == mDeferredFinal)
+    {
+        context.SetRootSignature(*ModelRenderer::sDeferredRootSig);
+        context.SetPipelineState(*ModelRenderer::sAllPSOs[mPSOIndex]);
+        context.SetDynamicConstantBufferView(ModelRenderer::kGlobalConstantsDeferred, sizeof(GlobalConstants), &globals);
+        context.SetDescriptorTable(ModelRenderer::kGBufferTextures, mScene->GetDeferredTextureHandle());
+        context.SetDescriptorTable(ModelRenderer::kSceneTexturesDeferred, mScene->GetSceneTextureHandles());
+        context.SetDescriptorTable(ModelRenderer::kShadowTextureDeferred, mScene->GetShadowTextureHandle());
+    }
+
+    context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    context.SetViewportAndScissor(mViewport, mScissor);
+    context.SetRenderTarget(mRenderTargets[0]->GetRTV());
+    context.ClearColor(*mRenderTargets[0]);
+    context.Draw(3);
 }

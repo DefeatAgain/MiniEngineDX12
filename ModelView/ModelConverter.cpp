@@ -23,13 +23,30 @@ static uint16_t GetTextureFlag(uint32_t type, bool alpha = false)
     case PBRMaterial::kBaseColor:
         return kSRGB | kDefaultBC | kGenerateMipMaps | (alpha ? kPreserveAlpha : 0);
     case PBRMaterial::kMetallicRoughness:
-        return kGenerateMipMaps | kDefaultBC;
+        return kGenerateMipMaps | kDefaultBC | kGenerateMipMaps;
     case PBRMaterial::kEmissive:
         return kSRGB | kDefaultBC | kGenerateMipMaps;
     case PBRMaterial::kNormal: // Use BC5 Compression
         return kDefaultBC | kNormalMap | kGenerateMipMaps;
     default:
         return kNoneTextureFlag;
+    }
+}
+
+static Graphics::eDefaultTexture GetDefaultTexture(uint32_t type)
+{
+    switch (type)
+    {
+    case PBRMaterial::kBaseColor:
+        return Graphics::kWhiteOpaque2D;
+    case PBRMaterial::kMetallicRoughness:
+        return Graphics::kWhiteOpaque2D;
+    case PBRMaterial::kEmissive:
+        return Graphics::kWhiteOpaque2D;
+    case PBRMaterial::kNormal: // Use BC5 Compression
+        return Graphics::kDefaultNormalMap;
+    default:
+        return Graphics::kWhiteOpaque2D;
     }
 }
 
@@ -84,6 +101,15 @@ static void LoadIBLTextures()
         if (specularIdx != std::wstring::npos)
         {
             std::wstring realname = filestem.substr(0, specularIdx) + L"_S";
+            GET_TEX(filePath);
+            sIBLTexturePaths[realname] = filePath;
+        }
+
+        // Load PreComputeBRDFTexture
+        size_t brdfIdx = filestem.rfind(L"_LUT.dds");
+        if (brdfIdx != std::wstring::npos)
+        {
+            std::wstring realname = filestem.substr(0, brdfIdx) + L"_LUT";
             GET_TEX(filePath);
             sIBLTexturePaths[realname] = filePath;
         }
@@ -162,13 +188,16 @@ namespace ModelConverter
                 pbrMat.mSamplerHandles[ti] = GET_SAM_HANDLE(texSampleDesc);
 
                 if (gltfMat.textures[ti] == nullptr)
+                {
+                    pbrMat.mTextures[ti] = GET_TEXD(GetDefaultTexture(ti));
                     continue;
+                }
 
                 std::filesystem::path imagePath = asset.m_basePath / gltfMat.textures[ti]->source->path;
                 pbrMat.mTextures[ti] = GET_TEXFF(
                     imagePath, 
                     GetTextureFlag(ti, (gltfMat.alphaBlend | gltfMat.alphaTest) && ti == PBRMaterial::kBaseColor),
-                    Graphics::kWhiteOpaque2D,
+                    GetDefaultTexture(ti),
                     pbrMat.mTextureHandles + ti);
             }
         }
@@ -408,10 +437,10 @@ namespace ModelConverter
 
         subMesh.psoFlags = ePSOFlags::kHasPosition | ePSOFlags::kHasNormal;
         outputElements.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT });
-        outputElements.push_back({ "NORMAL", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+        outputElements.push_back({ "NORMAL", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
         if (tangent.get())
         {
-            outputElements.push_back({ "TANGENT", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
+            outputElements.push_back({ "TANGENT", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT });
             subMesh.psoFlags |= ePSOFlags::kHasTangent;
         }
         if (texcoords[0].get() || meshPsoFlags & ePSOFlags::kHasUV0)

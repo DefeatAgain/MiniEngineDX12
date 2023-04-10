@@ -55,7 +55,7 @@ float GeometrySmith(float3 N, float3 wo, float3 wi, float roughness)
     return GeometrySchlickGGX(dot(N, wo), roughness) * GeometrySchlickGGX(dot(N, wi), roughness);
 }
 
-float3 ComputeNormal(Texture2D<float3> normalTexture, SamplerState normalSampler, 
+float3 ComputeNormal(Texture2D<float2> normalTexture, SamplerState normalSampler, 
     float2 uv, float3 normal, float4 tangent, float normalTextureScale)
 {
     // normal = normalize(normal);
@@ -63,8 +63,10 @@ float3 ComputeNormal(Texture2D<float3> normalTexture, SamplerState normalSampler
     float3 T = normalize(tangent.xyz);
     float3 B = normalize(cross(normal, T)) * tangent.w;
     float3x3 tangentFrame = float3x3(T, B, normal);
-
-    normal = normalTexture.Sample(normalSampler, uv) * 2.0 - 1.0;
+    
+    float2 normalTex = normalTexture.Sample(normalSampler, uv) * 2.0 - 1.0;
+    float normalTexZ = sqrt(1.0 - min(dot(normalTex, normalTex), 0.99999));
+    normal = float3(normalTex, normalTexZ);
 
     // glTF spec says to normalize N before and after scaling, but that's excessive
     normal = normalize(normal * float3(normalTextureScale, normalTextureScale, 1));

@@ -419,7 +419,7 @@ void glTF::Asset::ProcessBuffers( json& buffers, ByteArray chunk1bin )
         {
             ASSERT(it == buffers.GetArray().Begin(), "Only the 1st buffer allowed to be internal");
             ASSERT(chunk1bin->size() > 0, "GLB chunk1 missing data or not a GLB file");
-            m_trunkBuffer = chunk1bin;
+            m_buffers.push_back(chunk1bin);
         }
     }
 }
