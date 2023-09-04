@@ -197,6 +197,7 @@
     <ClInclude Include="PostEffect.h" />
     <ClInclude Include="SamplerManager.h" />
     <ClInclude Include="ShaderCompositor.h" />
+    <ClInclude Include="SSAO.h" />
     <ClInclude Include="SystemTime.h" />
     <ClInclude Include="TextRenderer.h" />
     <ClInclude Include="FrameContext.h" />
@@ -259,6 +260,7 @@
     <ClCompile Include="PostEffect.cpp" />
     <ClCompile Include="SamplerManager.cpp" />
     <ClCompile Include="ShaderComposior.cpp" />
+    <ClCompile Include="SSAO.cpp" />
     <ClCompile Include="SystemTime.cpp" />
     <ClCompile Include="TextRenderer.cpp" />
     <ClCompile Include="FrameContext.cpp" />

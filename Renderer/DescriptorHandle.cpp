@@ -64,37 +64,39 @@ void TreeShiftResetBit(uint32_t bitMap[], int startIdx, size_t startBitIdx)
     //return isCompleteReset;
 }
 
-static void TreeSinkSetAll(uint32_t bitMap[], int startIdx, size_t numNodes)
+void TreeSinkSetAll(uint32_t bitMap[], int startIdx, size_t startBitIdx, size_t numNodes)
 {
-    constexpr uint32_t ALL_BIT_SET = -1;
+    constexpr uint32_t BIT_SETS[] = { 3, 15, 255, 65535, 4294967295 };
 
-    int childLeft = startIdx * 2 + 1;
-    int childRight = startIdx * 2 + 2;
+    bool isLeft = startBitIdx < 16;
+    int childIndex = startIdx * 2 + (isLeft ? 1 : 2);
+    startBitIdx = (startBitIdx % 16) << 1;
 
-    if (childRight <= numNodes)
+    for (size_t i = 0; i < 5 && childIndex < numNodes; i++)
     {
-        bitMap[childLeft] = ALL_BIT_SET;
-        bitMap[childRight] = ALL_BIT_SET;
+        bitMap[childIndex] |= BIT_SETS[i] << startBitIdx;
 
-        TreeSinkSetAll(bitMap, childLeft, numNodes);
-        TreeSinkSetAll(bitMap, childRight, numNodes);
+        isLeft = startBitIdx < 16;
+        startBitIdx = (startBitIdx % 16) << 1;
+        childIndex = childIndex * 2 + (isLeft ? 1 : 2);
     }
 }
 
-static void TreeSinkResetAll(uint32_t bitMap[], int startIdx, size_t numNodes)
+void TreeSinkResetAll(uint32_t bitMap[], int startIdx, size_t startBitIdx, size_t numNodes)
 {
-    constexpr uint32_t ALL_BIT_SET = 0;
+    constexpr uint32_t BIT_SETS[] = { 3, 15, 255, 65535, 4294967295 };
 
-    int childLeft = startIdx * 2 + 1;
-    int childRight = startIdx * 2 + 2;
+    bool isLeft = startBitIdx < 16;
+    int childIndex = startIdx * 2 + (isLeft ? 1 : 2);
+    startBitIdx = (startBitIdx % 16) << 1;
 
-    if (childRight <= numNodes)
+    for (size_t i = 0; i < 5 && childIndex < numNodes; i++)
     {
-        bitMap[childLeft] = ALL_BIT_SET;
-        bitMap[childRight] = ALL_BIT_SET;
+        bitMap[childIndex] &= ~(BIT_SETS[i] << startBitIdx);
 
-        TreeSinkResetAll(bitMap, childLeft, numNodes);
-        TreeSinkResetAll(bitMap, childRight, numNodes);
+        isLeft = startBitIdx < 16;
+        startBitIdx = (startBitIdx % 16) << 1;
+        childIndex = childIndex * 2 + (isLeft ? 1 : 2);
     }
 }
 
@@ -105,11 +107,14 @@ void DescriptorAllocator::Deallocate(DescriptorHandle& handle, uint32_t count)
     constexpr uint32_t firstLayerSize = MAX_DESCRIPTOR_HEAP_SIZE / perNodeSize;
     ASSERT(count > 0 && count <= firstLayerSize);
 
+    if (!handle)
+        return;
+
     SubHeap* subHeap = GetSubHeap(handle.mOwningHeapIndex);
     ASSERT(subHeap);
 
     if (count > 1)
-        count = Math::AlignUp(count, 2);
+        count = Math::AlignUpToPower2(count);
 
     unsigned long maxLayerIdx = 0;
     unsigned long allocLayerIdx = 0;
@@ -130,7 +135,7 @@ void DescriptorAllocator::Deallocate(DescriptorHandle& handle, uint32_t count)
     subHeap->mBitMap[nodeIdx] ^= 1 << bitIdx;
 
     TreeShiftResetBit(subHeap->mBitMap, nodeIdx, bitIdx);
-    TreeSinkResetAll(subHeap->mBitMap, nodeIdx, ARRAYSIZE(subHeap->mBitMap));
+    TreeSinkResetAll(subHeap->mBitMap, nodeIdx, bitIdx, ARRAYSIZE(subHeap->mBitMap));
     subHeap->mNumRemainHandles += count;
     subHeap->mNumReleasedHandles += count;
 
@@ -152,7 +157,7 @@ DescriptorHandle DescriptorAllocator::Allocate(uint32_t count)
     ASSERT(count > 0 && count <= firstLayerSize);
 
     if (count > 1)
-        count = Math::AlignUp(count, 2);
+        count = Math::AlignUpToPower2(count);
 
     unsigned long maxLayerIdx = 0;
     unsigned long allocLayerIdx = 0;
@@ -186,7 +191,7 @@ DescriptorHandle DescriptorAllocator::AllocateLayer(uint32_t startLayerNodeIdx, 
     //if (subHeap->mBitMap.size() < totalNodeSize) // Fill tree nodes
         //subHeap->mBitMap.resize(totalNodeSize);
 
-    size_t offsetFromHeap = 0;
+    size_t offsetFromHeap = UNKNOWN_OFFSET;
     for (uint32_t i = startLayerNodeIdx, j = 0; i < totalNodeSize; i++, j++) // iter curlayer node
     {
         unsigned long freeIdx = 0;
@@ -196,7 +201,7 @@ DescriptorHandle DescriptorAllocator::AllocateLayer(uint32_t startLayerNodeIdx, 
             subHeap->mNumRemainHandles -= alignedCount;
             subHeap->mBitMap[i] |= 1 << freeIdx;
             TreeShiftSetBit(subHeap->mBitMap, i, freeIdx);
-            TreeSinkSetAll(subHeap->mBitMap, i, ARRAYSIZE(subHeap->mBitMap));
+            TreeSinkSetAll(subHeap->mBitMap, i, freeIdx, ARRAYSIZE(subHeap->mBitMap));
             break;
         }
     }

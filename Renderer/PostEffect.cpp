@@ -4,14 +4,21 @@
 #include "GraphicsResource.h"
 #include "FrameContext.h"
 #include "PixelBuffer.h"
+#include "SSAO.h"
 
-namespace PostEffectRender
+namespace
 {
     RootSignature* sPresentRS = nullptr;
 
     GraphicsPipelineState* sPresentSDRPS = nullptr;
     //GraphicsPipelineState* sCompositeSDRPS = GET_GPSO(L"PostEffect: CompositeSDR");
     GraphicsPipelineState* sScaleAndCompositeSDRPS = nullptr;
+
+}
+
+namespace PostEffectRenderer
+{
+    PostEffect* gPostEffectContext = nullptr;
 
     void Initialize()
     {
@@ -85,13 +92,14 @@ namespace PostEffectRender
 }
 
 
-PostEffect::PostEffect(float bufferWidth, float bufferHeight)
+PostEffect::PostEffect()
 {
 }
 
 void PostEffect::Initialize()
 {
-    PostEffectRender::Initialize();
+    PostEffectRenderer::Initialize();
+    SSAORenderer::Initialize();
 }
 
 void PostEffect::Update(float deltaTime)
@@ -110,7 +118,7 @@ void PostEffect::Render()
 
 CommandList* PostEffect::RenderTaskToneMapping(CommandList* commandList)
 {
-    using namespace PostEffectRender;
+    using namespace PostEffectRenderer;
 
     GraphicsCommandList& ghCommandList = commandList->GetGraphicsCommandList().Begin(L"ToneMapping");
     ghCommandList.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -134,5 +142,4 @@ CommandList* PostEffect::RenderTaskToneMapping(CommandList* commandList)
 
 void PostEffect::OnResizeSceneBuffer(uint32_t width, uint32_t height)
 {
-
 }

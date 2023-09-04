@@ -18,6 +18,57 @@
 namespace Math
 {
     class Vector4;
+    class Vector3;
+
+    // A 2-vector with an unspecified fourth component.  Depending on the context, the W can be 0 or 1, but both are implicit.
+   // The actual value of the fourth component is undefined for performance reasons.
+    class Vector2
+    {
+    public:
+
+        INLINE Vector2() {}
+        INLINE Vector2(float x, float y, float z) { m_vec = XMVectorSet(x, y, z, z); }
+        INLINE Vector2(const XMFLOAT2& v) { m_vec = XMLoadFloat2(&v); }
+        INLINE Vector2(const Vector2& v) { m_vec = v; }
+        INLINE Vector2(Scalar s) { m_vec = s; }
+        INLINE explicit Vector2(Vector4 vec);
+        INLINE explicit Vector2(Vector3 vec);
+        INLINE explicit Vector2(FXMVECTOR vec) { m_vec = vec; }
+        INLINE explicit Vector2(EZeroTag) { m_vec = SplatZero(); }
+        INLINE explicit Vector2(EIdentityTag) { m_vec = SplatOne(); }
+        INLINE explicit Vector2(EXUnitVector) { m_vec = CreateXUnitVector(); }
+        INLINE explicit Vector2(EYUnitVector) { m_vec = CreateYUnitVector(); }
+
+        INLINE operator XMVECTOR() const { return m_vec; }
+
+        INLINE Scalar GetX() const { return Scalar(XMVectorSplatX(m_vec)); }
+        INLINE Scalar GetY() const { return Scalar(XMVectorSplatY(m_vec)); }
+        INLINE void SetX(Scalar x) { m_vec = XMVectorPermute<4,1,2,3>(m_vec, x); }
+        INLINE void SetY(Scalar y) { m_vec = XMVectorPermute<0,5,2,3>(m_vec, y); }
+
+        INLINE Vector2 operator- () const { return Vector2(XMVectorNegate(m_vec)); }
+        INLINE Vector2 operator+ (Vector2 v2) const { return Vector2(XMVectorAdd(m_vec, v2)); }
+        INLINE Vector2 operator- (Vector2 v2) const { return Vector2(XMVectorSubtract(m_vec, v2)); }
+        INLINE Vector2 operator* (Vector2 v2) const { return Vector2(XMVectorMultiply(m_vec, v2)); }
+        INLINE Vector2 operator/ (Vector2 v2) const { return Vector2(XMVectorDivide(m_vec, v2)); }
+        INLINE Vector2 operator* (Scalar  v2) const { return *this * Vector2(v2); }
+        INLINE Vector2 operator/ (Scalar  v2) const { return *this / Vector2(v2); }
+        INLINE Vector2 operator* (float  v2) const { return *this * Scalar(v2); }
+        INLINE Vector2 operator/ (float  v2) const { return *this / Scalar(v2); }
+
+        INLINE Vector2& operator += (Vector2 v) { *this = *this + v; return *this; }
+        INLINE Vector2& operator -= (Vector2 v) { *this = *this - v; return *this; }
+        INLINE Vector2& operator *= (Vector2 v) { *this = *this * v; return *this; }
+        INLINE Vector2& operator /= (Vector2 v) { *this = *this / v; return *this; }
+
+        INLINE friend Vector2 operator* (Scalar  v1, Vector2 v2) { return Vector2(v1) * v2; }
+        INLINE friend Vector2 operator/ (Scalar  v1, Vector2 v2) { return Vector2(v1) / v2; }
+        INLINE friend Vector2 operator* (float   v1, Vector2 v2) { return Scalar(v1) * v2; }
+        INLINE friend Vector2 operator/ (float   v1, Vector2 v2) { return Scalar(v1) / v2; }
+
+    protected:
+        XMVECTOR m_vec;
+    };
 
     // A 3-vector with an unspecified fourth component.  Depending on the context, the W can be 0 or 1, but both are implicit.
     // The actual value of the fourth component is undefined for performance reasons.
@@ -135,6 +186,9 @@ namespace Math
         Scalar W = v.GetW();
         return Vector3(XMVectorSelect( XMVectorDivide(v, W), v, XMVectorEqual(W, SplatZero()) ));
     }
+
+    INLINE Vector2::Vector2(Vector4 vec) : m_vec((XMVECTOR)vec) {}
+    INLINE Vector2::Vector2(Vector3 vec) : m_vec((XMVECTOR)vec) {}
 
     class BoolVector
     {

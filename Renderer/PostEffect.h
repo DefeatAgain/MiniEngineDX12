@@ -1,15 +1,17 @@
 #pragma once
 #include "GraphicsContext.h"
 
-namespace PostEffectRender
-{
+class PostEffect;
 
+namespace PostEffectRenderer
+{
+    extern PostEffect* gPostEffectContext;
 }
 
 class PostEffect : public Graphics::MutiGraphicsContext
 {
 public:
-    PostEffect(float bufferWidth, float bufferHeight);
+    PostEffect();
     ~PostEffect() {}
 
     virtual void Initialize() override;
@@ -22,7 +24,6 @@ public:
 
     CommandList* RenderTaskToneMapping(CommandList* commandList);
 
-    //virtual void OnResizeSwapChain(uint32_t width, uint32_t height) {}
     virtual void OnResizeSceneBuffer(uint32_t width, uint32_t height) override;
 private:
     DescriptorHandle mTextureGpuHandles;

@@ -71,6 +71,7 @@
     <ClCompile Include="ImGui\imgui_demo.cpp" />
     <ClCompile Include="ImGui\imgui.cpp" />
     <ClCompile Include="ImGui\imgui_backend.cpp" />
+    <ClCompile Include="SSAO.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
@@ -141,6 +142,7 @@
     <ClInclude Include="ImGui\imstb_truetype.h" />
     <ClInclude Include="ImGui\imgui_backend.h" />
     <ClInclude Include="Fonts\CousineRegular.h" />
+    <ClInclude Include="SSAO.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Math\Functions.inl" />

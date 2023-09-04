@@ -95,7 +95,7 @@ public:
 
     void SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, ID3D12DescriptorHeap* heapPtr);
     void SetDescriptorHeaps(UINT heapCount, D3D12_DESCRIPTOR_HEAP_TYPE type[], ID3D12DescriptorHeap* heapPtrs[]);
-    virtual void SetPipelineState(const PipelineState& pso);
+    void SetPipelineState(const PipelineState& pso);
 
     void SetPredication(ID3D12Resource* resource, UINT64 bufferOffset, D3D12_PREDICATION_OP op);
     void InsertTimeStamp(ID3D12QueryHeap* pQueryHeap, uint32_t queryIdx);

@@ -189,6 +189,9 @@ public:
     void SetDepthStencilTarget(DepthBuffer& DSV) { mDepthBuffer = &DSV; }
     void SetDepthStencilTarget(DepthBuffer& DSV, ColorBuffer& nonMsaaDepthBuufer) { mDepthBuffer = &DSV; mNonMsaaDepthBuffer = &nonMsaaDepthBuufer; }
 
+    ColorBuffer& GetRenderTarget(size_t index) { return *mRenderTargets[index]; }
+    DepthBuffer& GetDepthStencilTarget() { return *mDepthBuffer; }
+
     const Math::Frustum& GetWorldFrustum(size_t passIndex = 0) const { return mRenderPasses[passIndex].camera->GetWorldSpaceFrustum(); }
     const Math::Frustum& GetViewFrustum(size_t passIndex = 0) const { return mRenderPasses[passIndex].camera->GetViewSpaceFrustum(); }
     const Math::Matrix4& GetViewMatrix(size_t passIndex = 0) const { return mRenderPasses[passIndex].camera->GetViewMatrix(); }
@@ -278,9 +281,9 @@ private:
 class FullScreenRenderer
 {
 public:
-    enum BatchType { mDeferredFinal };
+    enum BatchType { kDeferredFinal };
 public:
-    FullScreenRenderer() { Reset(); mBatchType = mDeferredFinal; }
+    FullScreenRenderer() { Reset(); mBatchType = kDeferredFinal; }
     ~FullScreenRenderer() {}
 
     void Reset();

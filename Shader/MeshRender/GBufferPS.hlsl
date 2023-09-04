@@ -47,24 +47,24 @@ static const uint EMISSIVE_FLAG = 0x04;
 static const uint NORMAL_FLAG = 0x08;
 
 
-uint3 PackData1(float3 normal, float3 bumpNormal, float4 baseColor, float3 occlusionMetallicRoughness)
+uint4 PackData1(float3 normal, float3 bumpNormal, float4 baseColor, float3 occlusionMetallicRoughness)
 {
     normal = normal * 0.5 + 0.5;
     bumpNormal = bumpNormal * 0.5 + 0.5;
-    uint r0 = (uint(normal.x * 255) & 0xFF) << 24 |
-              (uint(normal.y * 255) & 0xFF) << 16 |
-              (uint(bumpNormal.x * 255) & 0xFF) << 8 |
-              (uint(bumpNormal.y * 255) & 0xFF);
-    uint r1 = (uint(baseColor.r * 255) & 0xFF) << 24 |
+    uint r0 = (uint(normal.x * 1023) & 0x3FF) << 22 |
+              (uint(normal.y * 1023) & 0x3FF) << 12 |
+              (uint(normal.z * 1023) & 0x3FF) << 2;
+    uint r1 = (uint(bumpNormal.x * 1023) & 0x3FF) << 22 |
+              (uint(bumpNormal.y * 1023) & 0x3FF) << 12 |
+              (uint(bumpNormal.z * 1023) & 0x3FF) << 2;
+    uint r2 = (uint(baseColor.r * 255) & 0xFF) << 24 |
               (uint(baseColor.g * 255) & 0xFF) << 16 |
               (uint(baseColor.b * 255) & 0xFF) << 8 |
               (uint(baseColor.a * 255) & 0xFF);
-    uint r2 = (uint(occlusionMetallicRoughness.g * 255) & 0xFF) << 24 |
-              (uint(occlusionMetallicRoughness.b * 255) & 0xFF) << 16 |
-              (uint(normal.z * 255) & 0xFF) << 8 | 
-              (uint(bumpNormal.z * 255) & 0xFF);
+    uint r3 = (uint(occlusionMetallicRoughness.g * 255) & 0xFF) << 24 |
+              (uint(occlusionMetallicRoughness.b * 255) & 0xFF) << 16;
 
-    return uint3(r0, r1, r2);
+    return uint4(r0, r1, r2, r3);
 }
 
 
@@ -91,6 +91,6 @@ uint4 main(PSIutput psInput) : SV_Target
     float3 normal = ComputeNormal(normalTexture, normalSampler, UVSET(NORMAL_FLAG), 
         psInput.normalWorld, psInput.tangetWorld, gNormalTextureScale);
 
-    uint3 pack1 = PackData1(psInput.normalWorld, normal, baseColor, float3(occlusionMetallicRoughness.r, metallicRoughness));
-    return uint4(pack1, 0);
+    uint4 pack1 = PackData1(psInput.normalWorld, normal, baseColor, float3(occlusionMetallicRoughness.r, metallicRoughness));
+    return pack1;
 }

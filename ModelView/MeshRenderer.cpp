@@ -83,7 +83,7 @@ void ModelRenderer::Initialize()
 #ifdef DEFERRED_RENDER
     for (size_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
     {
-        sGubffer0[i].Create(L"GBuffer 0", Graphics::gDisplayWidth, Graphics::gDisplayHeight, 1, DEFERRED_GBUFFER0_FORMAT);
+        sGubffer0[i].Create(L"GBuffer 0", Graphics::gRenderWidth, Graphics::gRenderHeight, 1, DEFERRED_GBUFFER0_FORMAT);
     }
 #endif // DEFERRED_RENDER
 
@@ -740,7 +740,7 @@ void FullScreenRenderer::RenderScreen(GraphicsCommandList& context, GlobalConsta
     globals.InvViewProjMatrix = Math::Invert(mCamera->GetViewProjMatrix());
     globals.CameraPos = mCamera->GetPosition();
 
-    if (mBatchType == mDeferredFinal)
+    if (mBatchType == kDeferredFinal)
     {
         context.SetRootSignature(*ModelRenderer::sDeferredRootSig);
         context.SetPipelineState(*ModelRenderer::sAllPSOs[mPSOIndex]);

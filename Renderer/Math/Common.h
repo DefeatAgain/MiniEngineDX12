@@ -50,6 +50,7 @@ namespace Math
         value |= value >> 8;
         value |= value >> 16;
         value++;
+        return value;
         T x = value >> 1; // previous power of 2
         return T((value - n) > (n - x) ? x : value);
     }

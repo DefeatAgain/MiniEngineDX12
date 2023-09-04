@@ -225,6 +225,7 @@ public:
     DescriptorAllocator& GetAlloc(D3D12_DESCRIPTOR_HEAP_TYPE type) { return *mDescriptorAllocators[type]; }
 
     DescriptorAllocator& GetAllocGpu(D3D12_DESCRIPTOR_HEAP_TYPE type) { return *mDescriptorAllocators[type + D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES]; }
+
 private:
     std::vector<DescriptorAllocator*> mDescriptorAllocators;
 };

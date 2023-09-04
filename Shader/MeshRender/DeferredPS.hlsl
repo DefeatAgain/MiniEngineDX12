@@ -5,6 +5,7 @@
 
 Texture2D<uint4> GBuffer0		            : register(t0);
 Texture2D<float> depthBuffer	            : register(t1);
+Texture2D<float> aoTexture	                : register(t2);
 
 TextureCube<float3> radianceIBLTexture      : register(t10);
 TextureCube<float3> irradianceIBLTexture    : register(t11);
@@ -57,35 +58,41 @@ float LinearizeDepth(float z, float n, float f)
 RenderData GetRenderData(float3 positionSCN, float2 screenUV)
 {
     uint3 positionSV = uint3(positionSCN.xy, 0);
-    uint3 rawData = GBuffer0.Load(positionSV).xyz;
-    const float muitpler = 1.0 / 255.0;
-    float d00 = float((rawData.r >> 24) & 0xFF) * muitpler;
-    float d01 = float((rawData.r >> 16) & 0xFF) * muitpler;
-    float d02 = float((rawData.r >> 8) & 0xFF) * muitpler;
-    float d03 = float((rawData.r) & 0xFF) * muitpler;
+    uint4 rawData = GBuffer0.Load(positionSV);
+    const float muitpler255 = 1.0 / 255.0;
+    const float muitpler1023 = 1.0 / 1023.0;
+    
+    float4 d0, d1, d2, d3;
+    d0.x = float((rawData.r >> 22) & 0x3FF) * muitpler1023;
+    d0.y = float((rawData.r >> 12) & 0x3FF) * muitpler1023;
+    d0.z = float((rawData.r >> 2) & 0x3FF) * muitpler1023;
+    // float d03 = float((rawData.r) & 0xFF) * muitpler;
 
-    float d10 = float((rawData.g >> 24) & 0xFF) * muitpler;
-    float d11 = float((rawData.g >> 16) & 0xFF) * muitpler;
-    float d12 = float((rawData.g >> 8) & 0xFF) * muitpler;
-    float d13 = float((rawData.g) & 0xFF) * muitpler;
+    d1.x = float((rawData.g >> 22) & 0x3FF) * muitpler1023;
+    d1.y = float((rawData.g >> 12) & 0x3FF) * muitpler1023;
+    d1.z = float((rawData.g >> 2) & 0x3FF) * muitpler1023;
+    // float d13 = float((rawData.g) & 0xFF) * muitpler;
 
-    float d20 = float((rawData.b >> 24) & 0xFF) * muitpler;
-    float d21 = float((rawData.b >> 16) & 0xFF) * muitpler;
-    float d22 = float((rawData.b >> 8) & 0xFF) * muitpler;
-    float d23 = float((rawData.b) & 0xFF) * muitpler;
+    d2.x = float((rawData.b >> 24) & 0xFF) * muitpler255;
+    d2.y = float((rawData.b >> 16) & 0xFF) * muitpler255;
+    d2.z = float((rawData.b >> 8) & 0xFF) * muitpler255;
+    d2.w = float((rawData.b) & 0xFF) * muitpler255;
+
+    d3.x = float((rawData.a >> 24) & 0xFF) * muitpler255;
+    d3.y = float((rawData.a >> 16) & 0xFF) * muitpler255;
+    // float d32 = float((rawData.a >> 8) & 0xFF) * muitpler255;
+    // float d33 = float((rawData.a) & 0xFF) * muitpler255;
 
     RenderData data;
-    data.worldNormal = float3(d00, d01, d22);
-    data.bumpNormal = float3(d02, d03, d23);
-    data.worldNormal = normalize(2.0 * data.worldNormal - 1.0);
-    data.bumpNormal = normalize(2.0 * data.bumpNormal - 1.0);
-    data.baseColor = float4(d10, d11, d12, d13);
-    data.metallic = d20;
-    data.roughness = d21;
+    data.worldNormal = normalize(2.0 * d0.xyz - 1.0);
+    data.bumpNormal = normalize(2.0 * d1.xyz - 1.0);
+    data.baseColor = d2;
+    data.metallic = d3.x;
+    data.roughness = d3.y;
 
     data.screenDepth = depthBuffer.Load(positionSV);
     screenUV.y = 1.0 - screenUV.y;
-    screenUV = 2.0 * screenUV - 1.0f;
+    screenUV = 2.0 * screenUV - 1.0f; // convert to NDC
     float3 positionNDC = float3(screenUV, data.screenDepth);
     float4 positionWorldW = mul(gInvViewProjMatrix, float4(positionNDC, 1.0));
     positionWorldW /= positionWorldW.w;
@@ -178,7 +185,7 @@ float4 main( float4 positionSV : SV_Position, float2 uv : TexCoord0 ) : SV_Targe
     light.wi = gSunDirection;
     light.instensity = gSunIntensity;
 
-    float3 ambient = CalcIBL(light, surface);
+    float3 ambient = CalcIBL(light, surface) * aoTexture.Sample(defaultSampler, uv);
     float3 sunLight = GGXMicrofacet(light, surface);
 #if NUM_CSM_SHADOW_MAP > 1
     float visiblity = CalcDirectionShadow(sunShadowTexture, shadowSamplerComparison, renderData.shadowCoord, gShadowBias, 

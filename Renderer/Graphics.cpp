@@ -40,7 +40,7 @@ namespace Graphics
     bool gApplicationInited = false;
 
     eResolution gDisplayResolution = k720p;
-    eResolution gRenderResolution = k720p;
+    eResolution gRenderResolution = k1080p;
     uint32_t gDisplayWidth = 1920;
     uint32_t gDisplayHeight = 1080;
     uint32_t gRenderWidth = 1920;

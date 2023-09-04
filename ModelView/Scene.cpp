@@ -8,6 +8,7 @@
 #include "glTF.h"
 #include "PixelBuffer.h"
 #include "PipelineState.h"
+#include "SSAO.h"
 #include "Utils/ThreadPoolExecutor.h"
 
 void Scene::Destroy()
@@ -118,6 +119,8 @@ CommandList* Scene::RenderSceneDeferred(CommandList* context, std::shared_ptr<Me
     ghContext.PIXBeginEvent(L"ShadowMap"); // render shadowmap
     shadowRenderer.RenderMeshes(ghContext, globals, MeshRenderer::kZPass);
     ghContext.PIXEndEvent(); // render shadowmap end
+
+    SSAORenderer::RenderTaskSSAO(ghContext, GetDeferredTextureHandle(), meshRenderer.GetRenderTarget(0), meshRenderer.GetDepthStencilTarget());
 
     ghContext.PIXBeginEvent(L"DeferredFinal"); // render DeferredFinal
     deferredRender->RenderScreen(ghContext, globals);
@@ -517,6 +520,8 @@ void Scene::MapGpuDescriptors()
             GBuffers[j].GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         Graphics::gDevice->CopyDescriptorsSimple(1, mDeferredTextureGpuHandle + (i + 1),
             depthBuffer[j].GetDepthSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        Graphics::gDevice->CopyDescriptorsSimple(1, mDeferredTextureGpuHandle + (i + 2),
+            SSAORenderer::GetSSAOFinalHandle(j), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 #endif // DEFERRED_RENDER
 

@@ -42,7 +42,7 @@ namespace GameApp
 
         game.RegisterContext();
 
-        REGISTER_CONTEXT(PostEffect, Graphics::gRenderWidth, Graphics::gRenderHeight);
+        PostEffectRenderer::gPostEffectContext = REGISTER_CONTEXT(PostEffect);
         // TextContext As built-in context
         TextRenderer::gTextContext = REGISTER_CONTEXT(TextContext, Graphics::gDisplayWidth, Graphics::gDisplayHeight);
         ImGuiRenderer::gImguiContext = REGISTER_CONTEXT(ImGuiBackend);
