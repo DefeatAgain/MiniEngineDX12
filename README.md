@@ -11,4 +11,4 @@
 ![Sample2](https://github.com/DefeatAgain/MiniEngineDX12/blob/main/Samples/sample2.png)
 ## 其他项目支持
 MiniEngine: https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/MiniEngine <br/>
-Tracy: https://github.com/wolfpld/tracy (目前没有完全接入) <br/>
+Tracy: https://github.com/wolfpld/tracy <br/>
